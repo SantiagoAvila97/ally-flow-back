@@ -21,7 +21,7 @@ export const PLANTILLAS_PDF_SEED: PlantillaPdfCobro[] = [
     updatedAt: now,
   },
   {
-    id: 'pdf-norte-default',
+    id: 'pdf-demo-default',
     empresaId: EMPRESA_DEMO,
     aseguradoraId: null,
     razonSocial: 'DEMO Ltda.',

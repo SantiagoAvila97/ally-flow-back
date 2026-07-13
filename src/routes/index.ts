@@ -6,6 +6,7 @@ import balanceRoutes from './balance.routes';
 import casosRoutes from './casos.routes';
 import catalogosRoutes from './catalogos.routes';
 import costosRoutes from './costos.routes';
+import empresasRoutes from './empresas.routes';
 import geoRoutes from './geo.routes';
 
 const router = Router();
@@ -26,6 +27,7 @@ router.use('/balance', balanceRoutes);
 router.use('/casos', casosRoutes);
 router.use('/catalogos', catalogosRoutes);
 router.use('/costos', costosRoutes);
+router.use('/empresas', empresasRoutes);
 router.use('/geo', geoRoutes);
 
 export default router;

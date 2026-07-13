@@ -10,8 +10,8 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT NOT NULL UNIQUE,
   nombre TEXT NOT NULL,
   password_hash TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('ADMIN', 'ASESOR', 'TECNICO')),
-  empresa_id TEXT NOT NULL REFERENCES empresas (id)
+  role TEXT NOT NULL CHECK (role IN ('ADMIN', 'ASESOR', 'TECNICO', 'SUPER_ADMIN')),
+  empresa_id TEXT REFERENCES empresas (id)
 );
 
 CREATE TABLE IF NOT EXISTS aseguradoras (

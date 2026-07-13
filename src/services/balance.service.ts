@@ -2,6 +2,7 @@ import { casoRepository } from '../repositories/caso.repository';
 import type { BalancePeriodo, BalanceResumen } from '../types/balance';
 import type { Caso, EstadoCaso, LineaCobro } from '../types/caso';
 import type { PublicUser } from '../types/user';
+import { requireTenantEmpresaId } from './tenant-scope';
 
 const ESTADOS_OPERACION: EstadoCaso[] = [
   'PendienteAsignacion',
@@ -55,7 +56,7 @@ export class BalanceService {
   getResumen(user: PublicUser, periodo: BalancePeriodo = 'all'): BalanceResumen {
     const desde = periodStart(periodo);
     const casos = casoRepository
-      .findByEmpresa(user.empresaId)
+      .findByEmpresa(requireTenantEmpresaId(user))
       .filter((c) => inPeriod(c, desde));
 
     const totales = {

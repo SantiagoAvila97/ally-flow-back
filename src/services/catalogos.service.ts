@@ -8,6 +8,7 @@ import {
 } from '../repositories/catalogo.repository';
 import type { Aseguradora, CatalogosPayload, CiudadCatalogo } from '../types/catalogo';
 import type { PublicUser } from '../types/user';
+import { requireTenantEmpresaId } from './tenant-scope';
 
 export class CatalogosService {
   constructor(private readonly repo: ICatalogoRepository = catalogoRepository) {}
@@ -17,7 +18,7 @@ export class CatalogosService {
     return {
       aseguradoras: this.repo.listAseguradoras(true),
       ciudades: this.repo.listCiudades(true),
-      categoriasServicio: getCategoriasForEmpresa(user.empresaId),
+      categoriasServicio: getCategoriasForEmpresa(requireTenantEmpresaId(user)),
     };
   }
 

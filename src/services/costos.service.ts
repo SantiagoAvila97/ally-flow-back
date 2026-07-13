@@ -19,16 +19,21 @@ import type {
 } from '../types/plantilla-pdf';
 import { EMPTY_PLANTILLA_EXTRAS } from '../types/plantilla-pdf';
 import type { PublicUser } from '../types/user';
+import { requireTenantEmpresaId } from './tenant-scope';
 
 export class CostosService {
+  private eid(user: PublicUser): string {
+    return requireTenantEmpresaId(user);
+  }
+
   /**
    * Árbol completo: categorías con sus ítems (pantalla Costos).
    */
   listTree(user: PublicUser): CategoriaConItems[] {
-    const cats = costoRepository.listCategorias(user.empresaId);
+    const cats = costoRepository.listCategorias(this.eid(user));
     return cats.map((c) => ({
       ...c,
-      items: costoRepository.listItems(user.empresaId, c.id),
+      items: costoRepository.listItems(this.eid(user), c.id),
     }));
   }
 
@@ -42,14 +47,14 @@ export class CostosService {
     if (!nombre) throw new AppError(400, 'El nombre de la categoría es obligatorio');
 
     const dup = costoRepository
-      .listCategorias(user.empresaId)
+      .listCategorias(this.eid(user))
       .some((c) => c.nombre.toLowerCase() === nombre.toLowerCase());
     if (dup) throw new AppError(409, 'Ya existe una categoría con ese nombre');
 
     const now = new Date().toISOString();
     return costoRepository.createCategoria({
       id: costoRepository.nextId('cat'),
-      empresaId: user.empresaId,
+      empresaId: this.eid(user),
       nombre,
       descripcion: (input.descripcion ?? '').trim(),
       createdAt: now,
@@ -68,7 +73,7 @@ export class CostosService {
       const nombre = input.nombre.trim();
       if (!nombre) throw new AppError(400, 'El nombre no puede quedar vacío');
       const dup = costoRepository
-        .listCategorias(user.empresaId)
+        .listCategorias(this.eid(user))
         .some((c) => c.id !== id && c.nombre.toLowerCase() === nombre.toLowerCase());
       if (dup) throw new AppError(409, 'Ya existe una categoría con ese nombre');
       cat.nombre = nombre;
@@ -103,7 +108,7 @@ export class CostosService {
     const now = new Date().toISOString();
     return costoRepository.createItem({
       id: costoRepository.nextId('item'),
-      empresaId: user.empresaId,
+      empresaId: this.eid(user),
       categoriaId: input.categoriaId,
       nombre,
       descripcion: (input.descripcion ?? '').trim(),
@@ -161,7 +166,7 @@ export class CostosService {
 
   private requireCategoriaOwned(user: PublicUser, id: string): CategoriaCosto {
     const cat = costoRepository.findCategoria(id);
-    if (!cat || cat.empresaId !== user.empresaId) {
+    if (!cat || cat.empresaId !== this.eid(user)) {
       throw new AppError(404, 'Categoría no encontrada');
     }
     return cat;
@@ -169,7 +174,7 @@ export class CostosService {
 
   private requireItemOwned(user: PublicUser, id: string): ItemCosto {
     const item = costoRepository.findItem(id);
-    if (!item || item.empresaId !== user.empresaId) {
+    if (!item || item.empresaId !== this.eid(user)) {
       throw new AppError(404, 'Ítem no encontrado');
     }
     return item;
@@ -182,10 +187,10 @@ export class CostosService {
   }
 
   private ensureGeneral(user: PublicUser): PlantillaPdfCobro {
-    const existing = plantillaPdfRepository.findDefault(user.empresaId);
+    const existing = plantillaPdfRepository.findDefault(this.eid(user));
     if (existing) return existing;
-    return plantillaPdfRepository.upsert(user.empresaId, null, {
-      razonSocial: user.empresaNombre,
+    return plantillaPdfRepository.upsert(this.eid(user), null, {
+      razonSocial: user.empresaNombre ?? 'Empresa',
       tipoPlantilla: 'tabla_operativa',
       textoHeader: 'Factura para cobro',
     });
@@ -199,7 +204,7 @@ export class CostosService {
     const general = this.ensureGeneral(user);
     if (!aseguradoraId) return general;
 
-    const override = plantillaPdfRepository.findByAseguradora(user.empresaId, aseguradoraId);
+    const override = plantillaPdfRepository.findByAseguradora(this.eid(user), aseguradoraId);
     return {
       ...general,
       id: override?.id ?? '',
@@ -211,7 +216,7 @@ export class CostosService {
 
   listPlantillasPdf(user: PublicUser): PlantillaPdfCobro[] {
     this.ensureGeneral(user);
-    return plantillaPdfRepository.listByEmpresa(user.empresaId);
+    return plantillaPdfRepository.listByEmpresa(this.eid(user));
   }
 
   updatePlantillaPdf(
@@ -237,7 +242,7 @@ export class CostosService {
         ...EMPTY_PLANTILLA_EXTRAS,
         ...(input.extras ?? {}),
       };
-      plantillaPdfRepository.upsert(user.empresaId, aseguradoraId, { extras });
+      plantillaPdfRepository.upsert(this.eid(user), aseguradoraId, { extras });
 
       // Si también mandan branding, actualizar la general (misma cabecera para todos).
       const hasBranding =
@@ -252,20 +257,20 @@ export class CostosService {
         input.tipoPlantilla !== undefined;
       if (hasBranding) {
         const { aseguradoraId: _a, extras: _e, ...branding } = input;
-        plantillaPdfRepository.upsert(user.empresaId, null, branding);
+        plantillaPdfRepository.upsert(this.eid(user), null, branding);
       }
 
       return this.getPlantillaPdf(user, aseguradoraId);
     }
 
     const { aseguradoraId: _a, extras: _e, ...branding } = input;
-    plantillaPdfRepository.upsert(user.empresaId, null, branding);
+    plantillaPdfRepository.upsert(this.eid(user), null, branding);
     return this.getPlantillaPdf(user, null);
   }
 
   deletePlantillaPdf(user: PublicUser, id: string): void {
     const row = plantillaPdfRepository.findById(id);
-    if (!row || row.empresaId !== user.empresaId) {
+    if (!row || row.empresaId !== this.eid(user)) {
       throw new AppError(404, 'Plantilla no encontrada');
     }
     if (row.aseguradoraId === null) {
@@ -339,7 +344,7 @@ function buildCasoDemoPreview(user: PublicUser, aseguradoraNombre: string): Caso
     descripcion: 'Caso ficticio para previsualizar la factura de cobro.',
     cliente: aseguradoraNombre,
     estado: 'PendienteDocumentoCobro',
-    empresaId: user.empresaId,
+    empresaId: requireTenantEmpresaId(user),
     asesorId: user.id,
     tecnicoId: null,
     numeroAseguradora: 'PREV-001',

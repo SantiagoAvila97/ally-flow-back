@@ -317,3 +317,56 @@ export function persistDeletePlantilla(id: string): void {
   if (runtimeOnly()) return;
   fireAndForget(deletePlantillaDb(id), 'delete-plantilla');
 }
+
+export async function upsertEmpresa(e: {
+  id: string;
+  nombre: string;
+  slug: string;
+}): Promise<void> {
+  if (!hasDatabase()) return;
+  await getPool().query(
+    `INSERT INTO empresas (id, nombre, slug) VALUES ($1,$2,$3)
+     ON CONFLICT (id) DO UPDATE SET nombre = EXCLUDED.nombre, slug = EXCLUDED.slug`,
+    [e.id, e.nombre, e.slug],
+  );
+}
+
+export function persistEmpresa(e: { id: string; nombre: string; slug: string }): void {
+  if (runtimeOnly()) return;
+  fireAndForget(upsertEmpresa(e), 'empresa');
+}
+
+export async function upsertUser(u: {
+  id: string;
+  email: string;
+  nombre: string;
+  passwordHash: string;
+  role: string;
+  empresaId: string | null;
+}): Promise<void> {
+  if (!hasDatabase()) return;
+  await getPool().query(
+    `INSERT INTO users (id, email, nombre, password_hash, role, empresa_id)
+     VALUES ($1,$2,$3,$4,$5,$6)
+     ON CONFLICT (id) DO UPDATE SET
+       email = EXCLUDED.email,
+       nombre = EXCLUDED.nombre,
+       password_hash = EXCLUDED.password_hash,
+       role = EXCLUDED.role,
+       empresa_id = EXCLUDED.empresa_id`,
+    [u.id, u.email, u.nombre, u.passwordHash, u.role, u.empresaId],
+  );
+}
+
+export function persistUser(u: {
+  id: string;
+  email: string;
+  nombre: string;
+  passwordHash: string;
+  role: string;
+  empresaId: string | null;
+}): void {
+  if (runtimeOnly()) return;
+  fireAndForget(upsertUser(u), 'user');
+}
+

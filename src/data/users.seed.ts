@@ -81,3 +81,16 @@ export function findUserByEmail(email: string): User | undefined {
 export function findUserById(id: string): User | undefined {
   return usersStore.find((u) => u.id === id);
 }
+
+export function upsertUserInStore(user: User): void {
+  const idx = usersStore.findIndex((u) => u.id === user.id);
+  if (idx >= 0) {
+    usersStore[idx] = { ...user };
+  } else {
+    usersStore.push({ ...user });
+  }
+}
+
+export function listUsersByEmpresa(empresaId: string): User[] {
+  return usersStore.filter((u) => u.empresaId === empresaId);
+}

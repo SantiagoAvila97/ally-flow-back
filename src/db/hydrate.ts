@@ -73,7 +73,7 @@ export async function loadAllFromDb(): Promise<{
     nombre: r.nombre,
     passwordHash: r.password_hash,
     role: r.role,
-    empresaId: r.empresa_id,
+    empresaId: r.empresa_id ?? null,
   }));
 
   const aseguradoras: Aseguradora[] = asegRes.rows.map((r) => ({

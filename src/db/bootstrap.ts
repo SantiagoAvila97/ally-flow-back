@@ -8,22 +8,26 @@ import { env } from '../config/env';
 import { hasDatabase } from './pool';
 import { migrate } from './migrate';
 import { seedIfEmpty } from './seed';
+import { ensureSuperAdmin } from './ensure-super-admin';
 import { loadAllFromDb } from './hydrate';
 import { enablePersistence } from './persist';
 
 /**
  * Si hay DATABASE_URL: migra, seed (si vacío), hidrata repos en memoria y activa write-through.
- * Sin DATABASE_URL: modo demo in-memory (local).
+ * Sin DATABASE_URL: modo demo in-memory (local) + SUPER_ADMIN en memoria.
  */
 export async function bootstrapDatabase(): Promise<void> {
   if (!hasDatabase()) {
     console.log(`[db] no DATABASE_URL — in-memory (${env.appEnv})`);
+    await ensureSuperAdmin();
     return;
   }
 
   console.log(`[db] connecting (${env.appEnv})…`);
   await migrate();
   await seedIfEmpty();
+  enablePersistence(true);
+  await ensureSuperAdmin();
 
   const data = await loadAllFromDb();
   hydrateEmpresas(data.empresas);
@@ -33,7 +37,9 @@ export async function bootstrapDatabase(): Promise<void> {
   plantillaPdfRepository.hydrate(data.plantillas);
   casoRepository.hydrate(data.casos);
 
-  enablePersistence(true);
+  // Tras hydrate, re-asegura en store por si el insert no estaba en el snapshot.
+  await ensureSuperAdmin();
+
   console.log(
     `[db] ready — empresas=${data.empresas.length} users=${data.users.length} casos=${data.casos.length}`,
   );

@@ -6,7 +6,8 @@ export interface User {
   nombre: string;
   passwordHash: string;
   role: Role;
-  empresaId: string;
+  /** Null solo para SUPER_ADMIN (plataforma). */
+  empresaId: string | null;
 }
 
 /** Payload seguro que viaja en el JWT y se expone al cliente (sin password). */
@@ -15,8 +16,8 @@ export interface PublicUser {
   email: string;
   nombre: string;
   role: Role;
-  empresaId: string;
-  empresaNombre: string;
+  empresaId: string | null;
+  empresaNombre: string | null;
 }
 
 export interface JwtPayload {
@@ -24,8 +25,8 @@ export interface JwtPayload {
   email: string;
   nombre: string;
   role: Role;
-  empresaId: string;
-  empresaNombre: string;
+  empresaId: string | null;
+  empresaNombre: string | null;
   iat?: number;
   exp?: number;
 }

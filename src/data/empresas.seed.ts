@@ -1,8 +1,8 @@
 import type { Empresa } from '../types/empresa';
 
 export const EMPRESA_FULL = 'emp-full-soluciones';
-/** Tenant demo (antes Norte Seguros). Id estable para seeds/costos. */
-export const EMPRESA_DEMO = 'emp-norte-seguros';
+/** Tenant demo. Id estable para seeds/costos. */
+export const EMPRESA_DEMO = 'emp-demo';
 
 /**
  * Clientes (tenants) del MVP.
@@ -34,4 +34,17 @@ export function listEmpresas(): Empresa[] {
 
 export function findEmpresaById(id: string): Empresa | undefined {
   return empresasStore.find((e) => e.id === id);
+}
+
+export function findEmpresaBySlug(slug: string): Empresa | undefined {
+  return empresasStore.find((e) => e.slug === slug);
+}
+
+export function upsertEmpresaInStore(empresa: Empresa): void {
+  const idx = empresasStore.findIndex((e) => e.id === empresa.id);
+  if (idx >= 0) {
+    empresasStore[idx] = { ...empresa };
+  } else {
+    empresasStore.push({ ...empresa });
+  }
 }
