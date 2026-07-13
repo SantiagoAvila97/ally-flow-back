@@ -415,6 +415,30 @@ export async function deleteEmpresaCascade(empresaId: string): Promise<void> {
   }
 }
 
+/**
+ * Limpia datos operativos del tenant (casos, tarifas, clientes, plantillas).
+ * Conserva empresa, usuarios y logo. Solo herramientas QA/local.
+ */
+export async function wipeTenantOperationalData(empresaId: string): Promise<void> {
+  if (!hasDatabase()) return;
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('DELETE FROM casos WHERE empresa_id = $1', [empresaId]);
+    await client.query('DELETE FROM items_costo WHERE empresa_id = $1', [empresaId]);
+    await client.query('DELETE FROM categorias_costo WHERE empresa_id = $1', [empresaId]);
+    await client.query('DELETE FROM plantillas_pdf WHERE empresa_id = $1', [empresaId]);
+    await client.query('DELETE FROM aseguradoras WHERE empresa_id = $1', [empresaId]);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 export function persistDeleteEmpresaCascade(empresaId: string): void {
   if (runtimeOnly()) return;
   fireAndForget(deleteEmpresaCascade(empresaId), 'delete-empresa');

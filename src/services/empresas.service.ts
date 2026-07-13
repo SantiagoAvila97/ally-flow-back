@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { env } from '../config/env';
 import {
+  EMPRESA_DEMO,
   findEmpresaById,
   findEmpresaBySlug,
   isProtectedEmpresa,
@@ -16,10 +17,12 @@ import {
   upsertUserInStore,
 } from '../data/users.seed';
 import { hasDatabase } from '../db/pool';
+import { reseedDemoTenant } from '../db/reseed-demo';
 import {
   deleteEmpresaCascade,
   persistEmpresa,
   persistUser,
+  wipeTenantOperationalData,
 } from '../db/persist';
 import { AppError } from '../middlewares/error.middleware';
 import { catalogoRepository } from '../repositories/catalogo.repository';
@@ -31,6 +34,13 @@ import type { PublicUser, User } from '../types/user';
 import { isSuperAdmin } from '../types/roles';
 import { assertSquareLogoDataUrl } from '../utils/logo';
 import { titleCaseWords } from '../utils/text';
+
+/** Herramientas de datos (limpiar / reiniciar DEMO): solo QA y local, nunca PROD. */
+function assertQaDataTools(): void {
+  if (env.isProdApp) {
+    throw new AppError(403, 'Esta acción no está disponible en producción');
+  }
+}
 
 /** "Santiago Avila S.A.S" → "santiago-avila-sas" */
 export function slugifyEmpresa(raw: string): string {
@@ -197,9 +207,7 @@ export class EmpresasService {
 
   /** Solo QA/local — no PROD. */
   async delete(id: string): Promise<void> {
-    if (env.isProdApp) {
-      throw new AppError(403, 'No se pueden eliminar empresas en producción');
-    }
+    assertQaDataTools();
     const empresa = findEmpresaById(id);
     if (!empresa) throw new AppError(404, 'Empresa no encontrada');
 
@@ -213,6 +221,70 @@ export class EmpresasService {
     plantillaPdfRepository.deleteByEmpresa(id);
     removeUsersByEmpresaFromStore(id);
     removeEmpresaFromStore(id);
+  }
+
+  /**
+   * Limpia datos operativos de la empresa del OWNER (casos, tarifas, clientes, plantillas).
+   * Conserva usuarios, empresa y logo. Solo QA/local.
+   */
+  async clearMineData(
+    actor: PublicUser,
+  ): Promise<{ ok: true; empresaId: string; empresaNombre: string }> {
+    assertQaDataTools();
+    if (!actorIsOwner(actor) || !actor.empresaId) {
+      throw new AppError(403, 'Solo el OWNER puede limpiar los datos de su empresa');
+    }
+    const empresa = findEmpresaById(actor.empresaId);
+    if (!empresa) throw new AppError(404, 'Empresa no encontrada');
+
+    const empresaId = empresa.id;
+    if (hasDatabase()) {
+      await wipeTenantOperationalData(empresaId);
+    }
+
+    casoRepository.hydrate(
+      casoRepository.findAll().filter((c) => c.empresaId !== empresaId),
+    );
+    costoRepository.hydrate(
+      costoRepository.listAllCategorias().filter((c) => c.empresaId !== empresaId),
+      costoRepository.listAllItems().filter((i) => i.empresaId !== empresaId),
+    );
+    catalogoRepository.hydrate(
+      catalogoRepository.listAllAseguradoras().filter((a) => a.empresaId !== empresaId),
+      catalogoRepository.listCiudades(false),
+    );
+    plantillaPdfRepository.hydrate(
+      plantillaPdfRepository.listAll().filter((p) => p.empresaId !== empresaId),
+    );
+
+    const owner = findUserById(actor.id);
+    plantillaPdfRepository.upsert(empresaId, null, {
+      razonSocial: empresa.nombre,
+      nit: empresa.nit,
+      email: owner?.email ?? '',
+      textoFooter: `${empresa.nombre} — documento generado por Ally Flow.`,
+      tipoPlantilla: 'tabla_operativa',
+    });
+
+    return { ok: true, empresaId, empresaNombre: empresa.nombre };
+  }
+
+  /**
+   * Restaura tenant DEMO a datos por defecto (seed).
+   * SUPER_ADMIN o OWNER de DEMO. Solo QA/local.
+   */
+  async resetDemo(actor: PublicUser): Promise<{ ok: true; casos: number; users: number }> {
+    assertQaDataTools();
+    const isOwnerDemo = actorIsOwner(actor) && actor.empresaId === EMPRESA_DEMO;
+    if (!isSuperAdmin(actor.role) && !isOwnerDemo) {
+      throw new AppError(403, 'Solo SUPER_ADMIN u OWNER de DEMO pueden reiniciar datos DEMO');
+    }
+    if (!findEmpresaById(EMPRESA_DEMO)) {
+      throw new AppError(404, 'Empresa DEMO no encontrada');
+    }
+
+    const result = await reseedDemoTenant();
+    return { ok: true, ...result };
   }
 }
 

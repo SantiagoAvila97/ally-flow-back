@@ -43,6 +43,14 @@ export class InMemoryCostoRepository implements ICostoRepository {
       .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
   }
 
+  listAllCategorias(): CategoriaCosto[] {
+    return [...this.categorias];
+  }
+
+  listAllItems(): ItemCosto[] {
+    return [...this.items];
+  }
+
   findCategoria(id: string): CategoriaCosto | undefined {
     return this.categorias.find((c) => c.id === id);
   }

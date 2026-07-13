@@ -84,6 +84,10 @@ export class InMemoryCatalogoRepository implements ICatalogoRepository {
       .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
   }
 
+  listAllAseguradoras(): Aseguradora[] {
+    return [...this.aseguradoras];
+  }
+
   findAseguradoraById(id: string): Aseguradora | undefined {
     return this.aseguradoras.find((a) => a.id === id);
   }

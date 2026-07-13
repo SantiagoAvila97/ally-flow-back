@@ -37,6 +37,10 @@ export class InMemoryPlantillaPdfRepository {
       });
   }
 
+  listAll(): PlantillaPdfCobro[] {
+    return [...this.rows];
+  }
+
   findById(id: string): PlantillaPdfCobro | undefined {
     return this.rows.find((r) => r.id === id);
   }

@@ -15,6 +15,16 @@ router.patch('/me/logo', requireTenant, requireRoles('ADMIN'), (req, res, next) 
   empresasController.updateLogo(req, res, next),
 );
 
+/** Limpia datos operativos de mi empresa (OWNER). Solo QA/local. */
+router.post('/me/clear-data', requireTenant, requireRoles('ADMIN'), (req, res, next) =>
+  void empresasController.clearMineData(req, res, next),
+);
+
+/** Reinicia datos seed de DEMO (SUPER_ADMIN u OWNER DEMO). Solo QA/local. */
+router.post('/demo/reset', (req, res, next) =>
+  void empresasController.resetDemo(req, res, next),
+);
+
 /** SUPER ADMIN plataforma: Suite */
 router.get('/', requireRoles('SUPER_ADMIN'), (req, res, next) =>
   empresasController.list(req, res, next),

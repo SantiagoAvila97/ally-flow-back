@@ -3,45 +3,45 @@ import { z } from 'zod';
 import { costosService } from '../services/costos.service';
 
 const categoriaSchema = z.object({
-  nombre: z.string().min(1),
-  descripcion: z.string().optional(),
+  nombre: z.string().trim().min(1),
+  descripcion: z.string().trim().min(1),
 });
 
 const categoriaPatchSchema = z.object({
-  nombre: z.string().min(1).optional(),
-  descripcion: z.string().optional(),
+  nombre: z.string().trim().min(1).optional(),
+  descripcion: z.string().trim().min(1).optional(),
 });
 
 const itemSchema = z.object({
   categoriaId: z.string().min(1),
-  nombre: z.string().min(1),
-  descripcion: z.string().optional(),
+  nombre: z.string().trim().min(1),
+  descripcion: z.string().trim().min(1),
   costoInterno: z.number().min(0),
   precioSugerido: z.number().min(0),
-  unidad: z.string().optional(),
+  unidad: z.string().trim().min(1),
   activo: z.boolean().optional(),
 });
 
 const itemPatchSchema = z.object({
   categoriaId: z.string().min(1).optional(),
-  nombre: z.string().min(1).optional(),
-  descripcion: z.string().optional(),
+  nombre: z.string().trim().min(1).optional(),
+  descripcion: z.string().trim().min(1).optional(),
   costoInterno: z.number().min(0).optional(),
   precioSugerido: z.number().min(0).optional(),
-  unidad: z.string().optional(),
+  unidad: z.string().trim().min(1).optional(),
   activo: z.boolean().optional(),
 });
 
 const plantillaPatchSchema = z.object({
   aseguradoraId: z.string().min(1).nullable().optional(),
-  razonSocial: z.string().min(1).optional(),
-  nit: z.string().optional(),
-  ciudad: z.string().optional(),
-  telefono: z.string().optional(),
-  email: z.string().optional(),
-  colorAcento: z.string().optional(),
-  textoHeader: z.string().optional(),
-  textoFooter: z.string().optional(),
+  razonSocial: z.string().trim().min(1),
+  nit: z.string().trim().min(1),
+  ciudad: z.string().trim().min(1),
+  telefono: z.string().trim().min(1),
+  email: z.string().trim().min(1),
+  colorAcento: z.string().trim().min(1),
+  textoHeader: z.string().trim().min(1),
+  textoFooter: z.string().trim().min(1),
   tipoPlantilla: z.enum(['tabla_operativa', 'carta_siniestro']).optional(),
   extras: z
     .object({

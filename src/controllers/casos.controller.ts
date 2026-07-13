@@ -16,7 +16,7 @@ const crearSchema = z.object({
   direccion: z.string().min(5),
   ciudad: z.string().min(1),
   categoriaServicio: z.string().min(1),
-  observaciones: z.string().optional(),
+  observaciones: z.string().trim().min(3),
   lat: z.number().nullable().optional(),
   lon: z.number().nullable().optional(),
   direccionNormalizada: z.string().optional(),

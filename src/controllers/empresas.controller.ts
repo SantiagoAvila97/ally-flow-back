@@ -52,6 +52,24 @@ export class EmpresasController {
       next(err);
     }
   }
+
+  async resetDemo(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await empresasService.resetDemo(req.user!);
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async clearMineData(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await empresasService.clearMineData(req.user!);
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 export const empresasController = new EmpresasController();

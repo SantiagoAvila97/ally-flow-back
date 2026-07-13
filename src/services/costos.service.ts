@@ -47,6 +47,8 @@ export class CostosService {
   createCategoria(user: PublicUser, input: CrearCategoriaInput): CategoriaCosto {
     const nombre = titleCaseWords(input.nombre);
     if (!nombre) throw new AppError(400, 'El nombre de la categoría es obligatorio');
+    const descripcion = (input.descripcion ?? '').trim();
+    if (!descripcion) throw new AppError(400, 'La descripción de la categoría es obligatoria');
 
     const dup = costoRepository
       .listCategorias(this.eid(user))
@@ -58,7 +60,7 @@ export class CostosService {
       id: costoRepository.nextId('cat'),
       empresaId: this.eid(user),
       nombre,
-      descripcion: (input.descripcion ?? '').trim(),
+      descripcion,
       createdAt: now,
       updatedAt: now,
     });
@@ -81,7 +83,9 @@ export class CostosService {
       cat.nombre = nombre;
     }
     if (input.descripcion !== undefined) {
-      cat.descripcion = input.descripcion.trim();
+      const descripcion = input.descripcion.trim();
+      if (!descripcion) throw new AppError(400, 'La descripción no puede quedar vacía');
+      cat.descripcion = descripcion;
     }
 
     const updated = costoRepository.updateCategoria(id, {
@@ -104,6 +108,10 @@ export class CostosService {
 
     const nombre = titleCaseWords(input.nombre);
     if (!nombre) throw new AppError(400, 'El nombre del ítem es obligatorio');
+    const descripcion = (input.descripcion ?? '').trim();
+    if (!descripcion) throw new AppError(400, 'La descripción del ítem es obligatoria');
+    const unidad = (input.unidad ?? '').trim();
+    if (!unidad) throw new AppError(400, 'La unidad del ítem es obligatoria');
     this.assertMoney(input.costoInterno, 'costoInterno');
     this.assertMoney(input.precioSugerido, 'precioSugerido');
 
@@ -113,10 +121,10 @@ export class CostosService {
       empresaId: this.eid(user),
       categoriaId: input.categoriaId,
       nombre,
-      descripcion: (input.descripcion ?? '').trim(),
+      descripcion,
       costoInterno: input.costoInterno,
       precioSugerido: input.precioSugerido,
-      unidad: (input.unidad ?? 'und').trim() || 'und',
+      unidad,
       activo: input.activo ?? true,
       createdAt: now,
       updatedAt: now,
@@ -135,7 +143,11 @@ export class CostosService {
       if (!nombre) throw new AppError(400, 'El nombre no puede quedar vacío');
       item.nombre = nombre;
     }
-    if (input.descripcion !== undefined) item.descripcion = input.descripcion.trim();
+    if (input.descripcion !== undefined) {
+      const descripcion = input.descripcion.trim();
+      if (!descripcion) throw new AppError(400, 'La descripción no puede quedar vacía');
+      item.descripcion = descripcion;
+    }
     if (input.costoInterno !== undefined) {
       this.assertMoney(input.costoInterno, 'costoInterno');
       item.costoInterno = input.costoInterno;
@@ -144,7 +156,11 @@ export class CostosService {
       this.assertMoney(input.precioSugerido, 'precioSugerido');
       item.precioSugerido = input.precioSugerido;
     }
-    if (input.unidad !== undefined) item.unidad = input.unidad.trim() || 'und';
+    if (input.unidad !== undefined) {
+      const unidad = input.unidad.trim();
+      if (!unidad) throw new AppError(400, 'La unidad no puede quedar vacía');
+      item.unidad = unidad;
+    }
     if (input.activo !== undefined) item.activo = input.activo;
 
     const updated = costoRepository.updateItem(id, {

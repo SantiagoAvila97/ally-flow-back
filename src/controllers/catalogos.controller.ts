@@ -2,23 +2,23 @@ import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
 import { catalogosService } from '../services/catalogos.service';
 
-const contactoOpt = z.string().max(160).nullable().optional();
+const contactoReq = z.string().trim().min(1).max(160);
 
 const aseguradoraBody = z.object({
-  nombre: z.string().min(2).max(120),
-  nit: z.string().max(32).nullable().optional(),
-  personaResponsable: contactoOpt,
-  contactoCobros: contactoOpt,
-  whatsapp: contactoOpt,
+  nombre: z.string().trim().min(2).max(120),
+  nit: z.string().trim().min(1).max(32),
+  personaResponsable: contactoReq,
+  contactoCobros: contactoReq,
+  whatsapp: contactoReq,
   activa: z.boolean().optional(),
 });
 
 const aseguradoraPatch = z.object({
-  nombre: z.string().min(2).max(120).optional(),
-  nit: z.string().max(32).nullable().optional(),
-  personaResponsable: contactoOpt,
-  contactoCobros: contactoOpt,
-  whatsapp: contactoOpt,
+  nombre: z.string().trim().min(2).max(120).optional(),
+  nit: z.string().trim().min(1).max(32).optional(),
+  personaResponsable: contactoReq.optional(),
+  contactoCobros: contactoReq.optional(),
+  whatsapp: contactoReq.optional(),
   activa: z.boolean().optional(),
 });
 
