@@ -1,12 +1,14 @@
 {
   "name": "ally-flow-backend",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Ally Flow API — gestión de leads/casos con JWT y roles",
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "version:bump": "node scripts/bump-version.mjs",
+    "prepare": "node scripts/install-git-hooks.mjs"
   },
   "keywords": [
     "ally-flow",

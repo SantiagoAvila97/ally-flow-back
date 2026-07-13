@@ -1,16 +1,16 @@
 import { Router } from 'express';
 import { catalogosController } from '../controllers/catalogos.controller';
 import { authenticate } from '../middlewares/auth.middleware';
-import { requireRoles } from '../middlewares/role.middleware';
+import { requireRoles, requireTenant } from '../middlewares/role.middleware';
 
 /**
- * Catálogos de referencia (mocks hoy → DB después).
- * Lectura: cualquier autenticado.
- * Mutaciones: solo ADMIN.
+ * Catálogos de referencia.
+ * Lectura: usuarios de tenant autenticados.
+ * Mutaciones: solo ADMIN de la empresa (aseguradoras son globales hoy — solo ADMIN).
  */
 const router = Router();
 
-router.use(authenticate);
+router.use(authenticate, requireTenant);
 
 router.get('/', (req, res, next) => catalogosController.getAll(req, res, next));
 

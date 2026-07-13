@@ -2,20 +2,9 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-/**
- * Configuración centralizada del entorno.
- * Valida variables críticas al arrancar para fallar rápido en misconfiguraciones.
- */
-function required(key: string, fallback?: string): string {
-  const value = process.env[key] ?? fallback;
-  if (!value) {
-    throw new Error(`Missing required env var: ${key}`);
-  }
-  return value;
-}
-
 const nodeEnv = process.env.NODE_ENV ?? 'development';
 const isProd = nodeEnv === 'production';
+const appEnv = (process.env.APP_ENV ?? (isProd ? 'prod' : 'dev')).toLowerCase();
 
 function resolveJwtSecret(): string {
   const value = process.env.JWT_SECRET;
@@ -39,6 +28,29 @@ function resolveCorsOrigins(): string[] {
     .filter(Boolean);
 }
 
+/** Defaults distintos QA vs PROD (override con SUPER_ADMIN_* en Railway). */
+function resolveSuperAdminDefaults(): {
+  email: string;
+  password: string;
+  nombre: string;
+} {
+  if (appEnv === 'prod') {
+    return {
+      email: 'saviladev@allyflow.app',
+      password: 'Oldkfrj00utw+',
+      nombre: 'Santiago Avila',
+    };
+  }
+  // QA + local/dev: cuenta de prueba, password distinta a PROD
+  return {
+    email: 'superadmin.qa@allyflow.app',
+    password: 'QaSuperAdmin#2026!',
+    nombre: 'Super Admin QA',
+  };
+}
+
+const superDefaults = resolveSuperAdminDefaults();
+
 export const env = {
   port: Number(process.env.PORT ?? 3000),
   jwtSecret: resolveJwtSecret(),
@@ -52,8 +64,7 @@ export const env = {
   corsOrigin: resolveCorsOrigins()[0] ?? 'http://localhost:4200',
   nodeEnv,
   isProd,
-  /** APP_ENV=qa|prod fuerza NODE_ENV production semantics for TLS notes. */
-  appEnv: (process.env.APP_ENV ?? (isProd ? 'prod' : 'dev')).toLowerCase(),
+  appEnv,
   /** Postgres (Neon / Railway). Vacío = modo in-memory. */
   databaseUrl: process.env.DATABASE_URL ?? '',
   /** Neon y la mayoría de hosts cloud requieren SSL. */
@@ -63,29 +74,9 @@ export const env = {
     Boolean(process.env.DATABASE_URL?.includes('sslmode=require')),
   /** Opcional: mejora el pin exacto. Sin key se usa embed de Google por búsqueda. */
   googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY ?? '',
-  /**
-   * SUPER_ADMIN de plataforma (QA + PROD).
-   * En PROD la password NO puede usar el default del repo: define SUPER_ADMIN_PASSWORD.
-   */
-  superAdminEmail: (
-    process.env.SUPER_ADMIN_EMAIL ?? 'saviladev@allyflow.app'
-  )
+  superAdminEmail: (process.env.SUPER_ADMIN_EMAIL ?? superDefaults.email)
     .trim()
     .toLowerCase(),
-  superAdminPassword: resolveSuperAdminPassword(isProd, process.env.APP_ENV),
-  superAdminNombre: (process.env.SUPER_ADMIN_NOMBRE ?? 'Santiago Avila').trim(),
+  superAdminPassword: process.env.SUPER_ADMIN_PASSWORD ?? superDefaults.password,
+  superAdminNombre: (process.env.SUPER_ADMIN_NOMBRE ?? superDefaults.nombre).trim(),
 } as const;
-
-function resolveSuperAdminPassword(nodeIsProd: boolean, appEnvRaw?: string): string {
-  const fromEnv = process.env.SUPER_ADMIN_PASSWORD ?? '';
-  const appEnv = (appEnvRaw ?? (nodeIsProd ? 'prod' : 'dev')).toLowerCase();
-  const fallback = 'Oldkfrj00utw+';
-  if (appEnv === 'prod') {
-    if (!fromEnv || fromEnv.length < 10) {
-      // Prefer explicit var; if missing, still use fallback but warn loudly at boot via ensure
-      return fromEnv || fallback;
-    }
-    return fromEnv;
-  }
-  return fromEnv || fallback;
-}

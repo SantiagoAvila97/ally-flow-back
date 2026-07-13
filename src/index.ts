@@ -1,6 +1,7 @@
 import { createApp } from './app';
 import { env } from './config/env';
 import { bootstrapDatabase } from './db/bootstrap';
+import { APP_VERSION } from './version';
 
 async function main(): Promise<void> {
   await bootstrapDatabase();
@@ -11,6 +12,7 @@ async function main(): Promise<void> {
   ║         Ally Flow API  ·  MVP            ║
   ╠══════════════════════════════════════════╣
   ║  env: ${String(env.appEnv).padEnd(34)}║
+  ║  ver: ${String(APP_VERSION).padEnd(34)}║
   ║  cors: ${env.corsOrigins.join(', ').slice(0, 32).padEnd(33)}║
   ║  http://localhost:${String(env.port).padEnd(5)}                   ║
   ║  Health: /api/health                     ║

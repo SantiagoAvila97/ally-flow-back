@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import { casosController } from '../controllers/casos.controller';
 import { authenticate } from '../middlewares/auth.middleware';
-import { requireRoles } from '../middlewares/role.middleware';
+import { requireRoles, requireTenant } from '../middlewares/role.middleware';
 import { CASO_ACTION_ROLES } from '../types/caso-permissions';
 
 const router = Router();
 
-router.use(authenticate);
+router.use(authenticate, requireTenant);
 
 router.get('/', (req, res, next) => casosController.list(req, res, next));
 router.get(

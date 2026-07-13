@@ -8,6 +8,7 @@ import catalogosRoutes from './catalogos.routes';
 import costosRoutes from './costos.routes';
 import empresasRoutes from './empresas.routes';
 import geoRoutes from './geo.routes';
+import { APP_VERSION } from '../version';
 
 const router = Router();
 
@@ -16,6 +17,7 @@ router.get('/health', (_req, res) => {
     ok: true,
     status: 'ok',
     service: 'ally-flow-api',
+    version: APP_VERSION,
     appEnv: env.appEnv,
     database: hasDatabase() ? 'postgres' : 'memory',
     time: new Date().toISOString(),
