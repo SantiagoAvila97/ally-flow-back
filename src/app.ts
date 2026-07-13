@@ -4,7 +4,7 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { env } from './config/env';
-import { hasDatabase } from './db/pool';
+import { getDatabaseStatus } from './db/runtime-status';
 import { errorHandler } from './middlewares/error.middleware';
 import apiRoutes from './routes';
 import { APP_VERSION } from './version';
@@ -54,13 +54,15 @@ export function createApp() {
 
   // Health sin rate-limit (Railway lo consulta al desplegar).
   app.get('/api/health', (_req, res) => {
+    const db = getDatabaseStatus();
     res.status(200).json({
       ok: true,
       status: 'ok',
       service: 'ally-flow-api',
       version: APP_VERSION,
       appEnv: env.appEnv,
-      database: hasDatabase() ? 'postgres' : 'memory',
+      database: db.database,
+      databaseError: db.databaseError,
       time: new Date().toISOString(),
     });
   });

@@ -13,6 +13,7 @@ import { ensureTenantOwners } from './ensure-tenant-owners';
 import { ensureEmpresaLogos } from './ensure-empresa-logos';
 import { loadAllFromDb } from './hydrate';
 import { enablePersistence } from './persist';
+import { setDatabaseStatus } from './runtime-status';
 
 /**
  * Si hay DATABASE_URL: migra, seed (si vacío), hidrata repos en memoria y activa write-through.
@@ -21,6 +22,7 @@ import { enablePersistence } from './persist';
 export async function bootstrapDatabase(): Promise<void> {
   if (!hasDatabase()) {
     console.log(`[db] no DATABASE_URL — in-memory (${env.appEnv})`);
+    setDatabaseStatus('memory');
     await ensureSuperAdmin();
     await ensureTenantOwners();
     await ensureEmpresaLogos();
@@ -28,24 +30,31 @@ export async function bootstrapDatabase(): Promise<void> {
   }
 
   console.log(`[db] connecting (${env.appEnv})…`);
-  await migrate();
-  await seedIfEmpty();
-  enablePersistence(true);
-  await ensureSuperAdmin();
+  try {
+    await migrate();
+    await seedIfEmpty();
+    enablePersistence(true);
+    await ensureSuperAdmin();
 
-  const data = await loadAllFromDb();
-  hydrateEmpresas(data.empresas);
-  hydrateUsers(data.users);
-  catalogoRepository.hydrate(data.aseguradoras, data.ciudades);
-  costoRepository.hydrate(data.categorias, data.items);
-  plantillaPdfRepository.hydrate(data.plantillas);
-  casoRepository.hydrate(data.casos);
+    const data = await loadAllFromDb();
+    hydrateEmpresas(data.empresas);
+    hydrateUsers(data.users);
+    catalogoRepository.hydrate(data.aseguradoras, data.ciudades);
+    costoRepository.hydrate(data.categorias, data.items);
+    plantillaPdfRepository.hydrate(data.plantillas);
+    casoRepository.hydrate(data.casos);
 
-  await ensureSuperAdmin();
-  await ensureTenantOwners();
-  await ensureEmpresaLogos();
+    await ensureSuperAdmin();
+    await ensureTenantOwners();
+    await ensureEmpresaLogos();
 
-  console.log(
-    `[db] ready — empresas=${data.empresas.length} users=${data.users.length} casos=${data.casos.length}`,
-  );
+    setDatabaseStatus('postgres');
+    console.log(
+      `[db] ready — empresas=${data.empresas.length} users=${data.users.length} casos=${data.casos.length}`,
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    setDatabaseStatus('error', msg);
+    throw err;
+  }
 }
