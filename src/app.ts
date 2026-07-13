@@ -19,8 +19,24 @@ export function createApp() {
 
   app.use(
     cors({
-      origin: env.corsOrigin,
+      origin(origin, callback) {
+        // Requests sin Origin (curl, healthchecks, same-origin)
+        if (!origin) {
+          callback(null, true);
+          return;
+        }
+        const normalized = origin.replace(/\/$/, '');
+        const allowed = env.corsOrigins.some((o) => o === normalized || o === '*');
+        if (allowed) {
+          callback(null, true);
+          return;
+        }
+        console.warn(`[cors] blocked origin: ${origin} (allowed: ${env.corsOrigins.join(', ')})`);
+        callback(null, false);
+      },
       credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
     }),
   );
 

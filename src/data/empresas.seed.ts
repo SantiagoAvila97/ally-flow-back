@@ -1,7 +1,8 @@
 import type { Empresa } from '../types/empresa';
 
 export const EMPRESA_FULL = 'emp-full-soluciones';
-export const EMPRESA_NORTE = 'emp-norte-seguros';
+/** Tenant demo (antes Norte Seguros). Id estable para seeds/costos. */
+export const EMPRESA_DEMO = 'emp-norte-seguros';
 
 /**
  * Clientes (tenants) del MVP.
@@ -14,9 +15,9 @@ export const EMPRESAS_SEED: Empresa[] = [
     slug: 'full-soluciones',
   },
   {
-    id: EMPRESA_NORTE,
-    nombre: 'Norte Seguros',
-    slug: 'norte-seguros',
+    id: EMPRESA_DEMO,
+    nombre: 'DEMO',
+    slug: 'demo',
   },
 ];
 
