@@ -42,7 +42,7 @@ export const USERS_SEED: User[] = [
     empresaId: EMPRESA_FULL,
   },
   {
-    id: 'usr-norte-admin',
+    id: 'usr-demo-admin',
     email: 'admin@demo.local',
     nombre: 'Nora Admin Demo',
     passwordHash: bcrypt.hashSync('admin123', 10),
@@ -50,7 +50,7 @@ export const USERS_SEED: User[] = [
     empresaId: EMPRESA_DEMO,
   },
   {
-    id: 'usr-norte-asesor',
+    id: 'usr-demo-asesor',
     email: 'asesor@demo.local',
     nombre: 'Álvaro Asesor Demo',
     passwordHash: bcrypt.hashSync('asesor123', 10),
@@ -58,7 +58,7 @@ export const USERS_SEED: User[] = [
     empresaId: EMPRESA_DEMO,
   },
   {
-    id: 'usr-norte-tecnico',
+    id: 'usr-demo-tecnico',
     email: 'tecnico@demo.local',
     nombre: 'Tomás Técnico Demo',
     passwordHash: bcrypt.hashSync('tecnico123', 10),

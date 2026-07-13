@@ -213,7 +213,7 @@ export class CasosService {
     const id =
       typeof (this.repo as typeof casoRepository).nextId === 'function'
         ? (this.repo as typeof casoRepository).nextId(
-            requireTenantEmpresaId(user).includes('norte') ? 'caso-norte' : 'caso-full',
+            requireTenantEmpresaId(user).includes('demo') ? 'caso-demo' : 'caso-full',
           )
         : `caso-${Date.now()}`;
 

@@ -228,12 +228,12 @@ function buildCaso(ctx: EmpresaSeedCtx, def: CasoDemoDef, index: number): Caso {
   };
 }
 
-const DEFS_NORTE: CasoDemoDef[] = [
+const DEFS_DEMO: CasoDemoDef[] = [
   // Operación 3+4+5
   {
     estado: 'PendienteAsignacion',
     titulo: 'Inspección sede RRHH - sin técnico',
-    numeroAseguradora: 'NORTE-PA-001',
+    numeroAseguradora: 'DEMO-PA-001',
     aseguradora: 'Bolívar Seguros',
     titularNombre: 'Industrias Caribe S.A.S.',
     telefono: '+57 605 111 0000',
@@ -246,7 +246,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'PendienteAsignacion',
     titulo: 'Hogar - filtración sin asignar',
-    numeroAseguradora: 'NORTE-PA-002',
+    numeroAseguradora: 'DEMO-PA-002',
     aseguradora: 'Sura Seguros',
     titularNombre: 'Laura Mejía',
     telefono: '+57 300 222 3344',
@@ -259,9 +259,9 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'PendienteAsignacion',
     titulo: 'Local - vidrio vitrina',
-    numeroAseguradora: 'NORTE-PA-003',
+    numeroAseguradora: 'DEMO-PA-003',
     aseguradora: 'Liberty Seguros',
-    titularNombre: 'Moda Norte',
+    titularNombre: 'Moda Central',
     telefono: '+57 604 555 1212',
     direccion: 'Calle 10 #42-10',
     ciudad: 'Medellín',
@@ -272,9 +272,9 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'Asignado',
     titulo: 'Glass flota - parabrisas',
-    numeroAseguradora: 'NORTE-AS-001',
+    numeroAseguradora: 'DEMO-AS-001',
     aseguradora: 'Liberty Seguros',
-    titularNombre: 'Transportes del Norte',
+    titularNombre: 'Transportes del Valle',
     telefono: '+57 604 222 3344',
     direccion: 'Carrera 70 #32-10',
     ciudad: 'Medellín',
@@ -285,7 +285,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'Asignado',
     titulo: 'Apartamento - destape',
-    numeroAseguradora: 'NORTE-AS-002',
+    numeroAseguradora: 'DEMO-AS-002',
     aseguradora: 'Mapfre Colombia',
     titularNombre: 'Sebastián Ruiz',
     telefono: '+57 310 888 1122',
@@ -298,7 +298,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'Asignado',
     titulo: 'Oficina - sifón',
-    numeroAseguradora: 'NORTE-AS-003',
+    numeroAseguradora: 'DEMO-AS-003',
     aseguradora: 'Bolívar Seguros',
     titularNombre: 'Contadores del Valle',
     telefono: '+57 604 333 9900',
@@ -311,7 +311,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'Asignado',
     titulo: 'Hogar - tubería',
-    numeroAseguradora: 'NORTE-AS-004',
+    numeroAseguradora: 'DEMO-AS-004',
     aseguradora: 'Sura Seguros',
     titularNombre: 'Familia Giraldo',
     telefono: '+57 301 444 5566',
@@ -324,7 +324,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'EnGestion',
     titulo: 'Peritaje motocicleta - en campo',
-    numeroAseguradora: 'NORTE-EG-001',
+    numeroAseguradora: 'DEMO-EG-001',
     aseguradora: 'Sura Seguros',
     titularNombre: 'Diego Pardo',
     telefono: '+57 320 777 8899',
@@ -338,7 +338,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'EnGestion',
     titulo: 'Local - grasas',
-    numeroAseguradora: 'NORTE-EG-002',
+    numeroAseguradora: 'DEMO-EG-002',
     aseguradora: 'Bolívar Seguros',
     titularNombre: 'Asados del Parque',
     telefono: '+57 604 111 2233',
@@ -352,7 +352,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'EnGestion',
     titulo: 'Glass fachada - en sitio',
-    numeroAseguradora: 'NORTE-EG-003',
+    numeroAseguradora: 'DEMO-EG-003',
     aseguradora: 'Liberty Seguros',
     titularNombre: 'Torre Poblado',
     telefono: '+57 300 909 3344',
@@ -366,7 +366,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'EnGestion',
     titulo: 'Apartamento - calentador',
-    numeroAseguradora: 'NORTE-EG-004',
+    numeroAseguradora: 'DEMO-EG-004',
     aseguradora: 'Mapfre Colombia',
     titularNombre: 'Natalia Vélez',
     telefono: '+57 315 202 3344',
@@ -380,7 +380,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'EnGestion',
     titulo: 'Hogar - destape múltiple',
-    numeroAseguradora: 'NORTE-EG-005',
+    numeroAseguradora: 'DEMO-EG-005',
     aseguradora: 'Sura Seguros',
     titularNombre: 'Héctor López',
     telefono: '+57 311 303 4455',
@@ -396,7 +396,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'PendienteDocumentoCobro',
     titulo: 'Calentador - documento por enviar',
-    numeroAseguradora: 'NORTE-PD-001',
+    numeroAseguradora: 'DEMO-PD-001',
     aseguradora: 'Liberty Seguros',
     titularNombre: 'Camila Restrepo',
     telefono: '+57 300 111 4455',
@@ -412,7 +412,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'PendienteDocumentoCobro',
     titulo: 'Glass flota - armar PDF',
-    numeroAseguradora: 'NORTE-PD-002',
+    numeroAseguradora: 'DEMO-PD-002',
     aseguradora: 'Sura Seguros',
     titularNombre: 'Logística Antioquia',
     telefono: '+57 604 222 7788',
@@ -428,7 +428,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'PendienteDocumentoCobro',
     titulo: 'Oficina - cobro pendiente PDF',
-    numeroAseguradora: 'NORTE-PD-003',
+    numeroAseguradora: 'DEMO-PD-003',
     aseguradora: 'Bolívar Seguros',
     titularNombre: 'Grupo Caribe Soft',
     telefono: '+57 605 333 9900',
@@ -444,7 +444,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'PendienteDocumentoCobro',
     titulo: 'VIP local - sin PDF',
-    numeroAseguradora: 'NORTE-PD-004',
+    numeroAseguradora: 'DEMO-PD-004',
     aseguradora: 'Mapfre Colombia',
     titularNombre: 'Galería Suramericana',
     telefono: '+57 604 444 1122',
@@ -462,7 +462,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'PendienteConfirmacionAsegurado',
     titulo: 'Asistencia vial - pendiente confirmación',
-    numeroAseguradora: 'NORTE-CA-001',
+    numeroAseguradora: 'DEMO-CA-001',
     aseguradora: 'Sura Seguros',
     titularNombre: 'María Cano',
     telefono: '+57 301 555 6677',
@@ -478,7 +478,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'PendienteConfirmacionAsegurado',
     titulo: 'Mega glass - confirmación',
-    numeroAseguradora: 'NORTE-CA-002',
+    numeroAseguradora: 'DEMO-CA-002',
     aseguradora: 'Liberty Seguros',
     titularNombre: 'Flota Andina',
     telefono: '+57 320 666 7788',
@@ -494,7 +494,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'PendienteConfirmacionAsegurado',
     titulo: 'Mixto hidráulico - confirmación',
-    numeroAseguradora: 'NORTE-CA-003',
+    numeroAseguradora: 'DEMO-CA-003',
     aseguradora: 'Bolívar Seguros',
     titularNombre: 'Conjunto Laureles',
     telefono: '+57 604 777 8899',
@@ -512,7 +512,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'PendienteRecepcionPago',
     titulo: 'Trampa grasas - espera pago',
-    numeroAseguradora: 'NORTE-RP-001',
+    numeroAseguradora: 'DEMO-RP-001',
     aseguradora: 'Bolívar Seguros',
     titularNombre: 'Local Plaza Mayor',
     telefono: '+57 604 888 1212',
@@ -528,7 +528,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'PendienteRecepcionPago',
     titulo: 'XL estructural - pago en trámite',
-    numeroAseguradora: 'NORTE-RP-002',
+    numeroAseguradora: 'DEMO-RP-002',
     aseguradora: 'Mapfre Colombia',
     titularNombre: 'Edificio Centro',
     telefono: '+57 604 101 2020',
@@ -544,7 +544,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'PendienteRecepcionPago',
     titulo: 'VIP - espera consignación',
-    numeroAseguradora: 'NORTE-RP-003',
+    numeroAseguradora: 'DEMO-RP-003',
     aseguradora: 'Sura Seguros',
     titularNombre: 'Centro Comercial Unicentro',
     telefono: '+57 604 303 4040',
@@ -560,7 +560,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'PendienteRecepcionPago',
     titulo: 'Calentador - pago',
-    numeroAseguradora: 'NORTE-RP-004',
+    numeroAseguradora: 'DEMO-RP-004',
     aseguradora: 'Liberty Seguros',
     titularNombre: 'Familia Restrepo',
     telefono: '+57 300 505 6060',
@@ -576,7 +576,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'PendienteRecepcionPago',
     titulo: 'Oficina hidráulica - pago',
-    numeroAseguradora: 'NORTE-RP-005',
+    numeroAseguradora: 'DEMO-RP-005',
     aseguradora: 'Bolívar Seguros',
     titularNombre: 'Barranquilla Soft',
     telefono: '+57 605 707 8080',
@@ -594,7 +594,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'Cobrado',
     titulo: 'Inspección corporativa - cobrada',
-    numeroAseguradora: 'NORTE-CO-001',
+    numeroAseguradora: 'DEMO-CO-001',
     aseguradora: 'Mapfre Colombia',
     titularNombre: 'Grupo Andino',
     telefono: '+57 604 333 2211',
@@ -611,9 +611,9 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'Cobrado',
     titulo: 'Glass flota - cobrado',
-    numeroAseguradora: 'NORTE-CO-002',
+    numeroAseguradora: 'DEMO-CO-002',
     aseguradora: 'Liberty Seguros',
-    titularNombre: 'Transportes del Norte',
+    titularNombre: 'Transportes del Valle',
     telefono: '+57 604 222 3344',
     direccion: 'Carrera 70 #32-10',
     ciudad: 'Medellín',
@@ -628,7 +628,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'Cobrado',
     titulo: 'Mega reparación - cobrado',
-    numeroAseguradora: 'NORTE-CO-003',
+    numeroAseguradora: 'DEMO-CO-003',
     aseguradora: 'Sura Seguros',
     titularNombre: 'Plaza Mayor Locales',
     telefono: '+57 604 999 1122',
@@ -645,7 +645,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'Cobrado',
     titulo: 'Calentador - cobrado',
-    numeroAseguradora: 'NORTE-CO-004',
+    numeroAseguradora: 'DEMO-CO-004',
     aseguradora: 'Bolívar Seguros',
     titularNombre: 'Familia Cano',
     telefono: '+57 301 111 2233',
@@ -662,7 +662,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'Cobrado',
     titulo: 'Chico destape - cobrado',
-    numeroAseguradora: 'NORTE-CO-005',
+    numeroAseguradora: 'DEMO-CO-005',
     aseguradora: 'Mapfre Colombia',
     titularNombre: 'Apto Laureles 302',
     telefono: '+57 310 222 3344',
@@ -679,7 +679,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'Cobrado',
     titulo: 'VIP - cobrado',
-    numeroAseguradora: 'NORTE-CO-006',
+    numeroAseguradora: 'DEMO-CO-006',
     aseguradora: 'Liberty Seguros',
     titularNombre: 'Centro Comercial Premier',
     telefono: '+57 604 444 5566',
@@ -696,7 +696,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'Cobrado',
     titulo: 'Oficina - cobrado',
-    numeroAseguradora: 'NORTE-CO-007',
+    numeroAseguradora: 'DEMO-CO-007',
     aseguradora: 'Sura Seguros',
     titularNombre: 'Soft Caribe',
     telefono: '+57 605 555 6677',
@@ -715,7 +715,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'EnGarantia',
     titulo: 'Garantía peritaje moto',
-    numeroAseguradora: 'NORTE-GA-001',
+    numeroAseguradora: 'DEMO-GA-001',
     aseguradora: 'Sura Seguros',
     titularNombre: 'Diego Pardo',
     telefono: '+57 320 777 8899',
@@ -729,9 +729,9 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'EnGarantia',
     titulo: 'Garantía glass - revisit',
-    numeroAseguradora: 'NORTE-GA-002',
+    numeroAseguradora: 'DEMO-GA-002',
     aseguradora: 'Liberty Seguros',
-    titularNombre: 'Transportes del Norte',
+    titularNombre: 'Transportes del Valle',
     telefono: '+57 604 222 3344',
     direccion: 'Carrera 70 #32-10',
     ciudad: 'Medellín',
@@ -743,7 +743,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'CerradoGarantia',
     titulo: 'Garantía asistencia - cerrada',
-    numeroAseguradora: 'NORTE-CG-001',
+    numeroAseguradora: 'DEMO-CG-001',
     aseguradora: 'Sura Seguros',
     titularNombre: 'María Cano',
     telefono: '+57 301 555 6677',
@@ -759,7 +759,7 @@ const DEFS_NORTE: CasoDemoDef[] = [
   {
     estado: 'CerradoGarantia',
     titulo: 'Garantía destape - cerrada',
-    numeroAseguradora: 'NORTE-CG-002',
+    numeroAseguradora: 'DEMO-CG-002',
     aseguradora: 'Mapfre Colombia',
     titularNombre: 'Sebastián Ruiz',
     telefono: '+57 310 888 1122',
@@ -777,11 +777,11 @@ const DEFS_NORTE: CasoDemoDef[] = [
 const CTX_DEMO: EmpresaSeedCtx = {
   empresaId: EMPRESA_DEMO,
   prefix: 'caso-demo',
-  asesorId: 'usr-norte-asesor',
+  asesorId: 'usr-demo-asesor',
   asesorNombre: 'Álvaro Asesor Demo',
-  tecnicoId: 'usr-norte-tecnico',
+  tecnicoId: 'usr-demo-tecnico',
   tecnicoNombre: 'Tomás Técnico Demo',
-  adminId: 'usr-norte-admin',
+  adminId: 'usr-demo-admin',
   adminNombre: 'Nora Admin Demo',
 };
 
@@ -808,7 +808,7 @@ function expandDefs(defs: CasoDemoDef[], target: number, tag: string): CasoDemoD
   return [...defs, ...extra];
 }
 
-const DEFS_DEMO_80 = expandDefs(DEFS_NORTE, 80, 'DEMO');
+const DEFS_DEMO_80 = expandDefs(DEFS_DEMO, 80, 'DEMO');
 
 export const CASOS_SEED: Caso[] = [
   ...DEFS_DEMO_80.map((d, i) => buildCaso(CTX_DEMO, d, i + 1)),
