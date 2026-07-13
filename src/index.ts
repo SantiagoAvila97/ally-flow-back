@@ -6,7 +6,8 @@ import { APP_VERSION } from './version';
 async function main(): Promise<void> {
   await bootstrapDatabase();
   const app = createApp();
-  app.listen(env.port, () => {
+  // Railway / Docker: escuchar en todas las interfaces (si no, el healthcheck falla).
+  app.listen(env.port, '0.0.0.0', () => {
     console.log(`
   ╔══════════════════════════════════════════╗
   ║         Ally Flow API  ·  MVP            ║
@@ -14,7 +15,7 @@ async function main(): Promise<void> {
   ║  env: ${String(env.appEnv).padEnd(34)}║
   ║  ver: ${String(APP_VERSION).padEnd(34)}║
   ║  cors: ${env.corsOrigins.join(', ').slice(0, 32).padEnd(33)}║
-  ║  http://localhost:${String(env.port).padEnd(5)}                   ║
+  ║  http://0.0.0.0:${String(env.port).padEnd(5)}                     ║
   ║  Health: /api/health                     ║
   ║  Login:  POST /api/auth/login            ║
   ╚══════════════════════════════════════════╝
