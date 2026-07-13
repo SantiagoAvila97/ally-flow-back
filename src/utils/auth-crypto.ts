@@ -22,7 +22,7 @@ function loadOrCreateKeyPair(): { privatePem: string; publicPem: string } {
     privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
   });
 
-  if (env.appEnv === 'prod' || env.appEnv === 'qa') {
+  if (env.isDeployed) {
     console.warn(
       '[auth-crypto] AUTH_RSA_PRIVATE_KEY no definido — clave efímera por proceso. ' +
         'En Railway con >1 réplica define AUTH_RSA_PRIVATE_KEY.',

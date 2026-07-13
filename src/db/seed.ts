@@ -23,7 +23,7 @@ export async function isDatabaseEmpty(): Promise<boolean> {
  */
 export async function seedIfEmpty(): Promise<void> {
   const forceDemo = process.env.SEED_DEMO === 'true' || process.env.SEED_DEMO === '1';
-  if (env.appEnv === 'prod' && !forceDemo) {
+  if (env.isProdApp && !forceDemo) {
     console.log('[db] APP_ENV=prod — skip demo seed (crea empresa/admin en Neon SQL Editor)');
     return;
   }

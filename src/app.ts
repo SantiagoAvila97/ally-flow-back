@@ -18,7 +18,7 @@ export function createApp() {
       contentSecurityPolicy: false,
       crossOriginResourcePolicy: { policy: 'cross-origin' },
       // TLS termina en Railway; el header refuerza HTTPS en el browser.
-      hsts: env.isProd || env.appEnv === 'prod' || env.appEnv === 'qa'
+      hsts: env.isDeployed
         ? { maxAge: 15_552_000, includeSubDomains: true }
         : false,
     }),

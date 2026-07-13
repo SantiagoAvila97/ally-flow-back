@@ -22,8 +22,8 @@ function cookieMaxAgeMs(): number {
  * Local (localhost:4200 ↔ :3000): SameSite=Lax, Secure off.
  */
 export function authCookieOptions(): CookieOptions {
-  const crossSite =
-    env.isProd || env.appEnv === 'prod' || env.appEnv === 'qa';
+  // LOCAL (dev): Lax. QA/PROD (Vercel↔Railway): None+Secure.
+  const crossSite = env.isDeployed;
   return {
     httpOnly: true,
     secure: crossSite,
