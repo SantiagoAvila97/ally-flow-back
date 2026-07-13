@@ -1,4 +1,5 @@
 import { AppError } from '../middlewares/error.middleware';
+import { findEmpresaById } from '../data/empresas.seed';
 import { costoRepository } from '../repositories/costo.repository';
 import { plantillaPdfRepository } from '../repositories/plantilla-pdf.repository';
 import { catalogosService } from './catalogos.service';
@@ -235,8 +236,8 @@ export class CostosService {
       input.aseguradoraId === undefined ? null : input.aseguradoraId;
 
     if (aseguradoraId) {
-      const aseg = catalogosService.listAseguradoras(false).find((a) => a.id === aseguradoraId);
-      if (!aseg) throw new AppError(400, 'Aseguradora no válida');
+      const aseg = catalogosService.listAseguradoras(user, false).find((a) => a.id === aseguradoraId);
+      if (!aseg) throw new AppError(400, 'Cliente no válido');
 
       // Cabecera unificada: branding solo en general; aquí solo extras.
       const extras = {
@@ -282,10 +283,10 @@ export class CostosService {
     }
   }
 
-  /** Cabecera general + extras de la aseguradora del caso (si existen). */
+  /** Cabecera general + extras del cliente del caso (si existen). */
   resolvePlantillaForCaso(user: PublicUser, aseguradoraNombre: string): PlantillaPdfCobro {
     const aseg = catalogosService
-      .listAseguradoras(false)
+      .listAseguradoras(user, false)
       .find((a) => a.nombre.toLowerCase() === aseguradoraNombre.trim().toLowerCase());
     if (aseg) return this.getPlantillaPdf(user, aseg.id);
     return this.getPlantillaPdf(user, null);
@@ -327,13 +328,15 @@ export class CostosService {
       throw new AppError(400, 'Tipo de plantilla inválido');
     }
 
-    let aseguradoraNombre = 'Aseguradora de ejemplo';
+    let aseguradoraNombre = 'Cliente de ejemplo';
     if (asegId) {
-      const aseg = catalogosService.listAseguradoras(false).find((a) => a.id === asegId);
+      const aseg = catalogosService.listAseguradoras(user, false).find((a) => a.id === asegId);
       if (aseg) aseguradoraNombre = aseg.nombre;
     }
 
-    return buildDocumentoCobroPdf(buildCasoDemoPreview(user, aseguradoraNombre), plantilla);
+    return buildDocumentoCobroPdf(buildCasoDemoPreview(user, aseguradoraNombre), plantilla, {
+      logoDataUrl: findEmpresaById(requireTenantEmpresaId(user))?.logoDataUrl ?? null,
+    });
   }
 }
 

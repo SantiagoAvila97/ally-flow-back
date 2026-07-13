@@ -8,6 +8,7 @@ import catalogosRoutes from './catalogos.routes';
 import costosRoutes from './costos.routes';
 import empresasRoutes from './empresas.routes';
 import geoRoutes from './geo.routes';
+import usuariosRoutes from './usuarios.routes';
 import { APP_VERSION } from '../version';
 
 const router = Router();
@@ -31,5 +32,6 @@ router.use('/catalogos', catalogosRoutes);
 router.use('/costos', costosRoutes);
 router.use('/empresas', empresasRoutes);
 router.use('/geo', geoRoutes);
+router.use('/usuarios', usuariosRoutes);
 
 export default router;

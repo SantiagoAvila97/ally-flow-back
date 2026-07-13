@@ -14,22 +14,21 @@ import { permissionsForRole } from '../types/permissions';
 import { requireTenantEmpresaId } from './tenant-scope';
 import { titleCaseWords } from '../utils/text';
 
-/** ~2MB de texto; cubre dataURL de foto/firma razonable. */
-const MAX_MEDIA_CHARS = 2_000_000;
+/** ~2.5MB de texto; foto/firma comprimidasy enviadas como dataURL. */
+const MAX_MEDIA_CHARS = 2_500_000;
 const DATA_IMAGE_RE = /^data:image\/(png|jpeg|jpg|webp);base64,/i;
 
 function assertMediaPayload(raw: string, field: string): string {
   const value = raw.trim();
   if (!value) throw new AppError(400, `${field} requerida`);
   if (value.length > MAX_MEDIA_CHARS) {
-    throw new AppError(400, `${field} demasiado grande (máx. ~2MB)`);
+    throw new AppError(400, `${field} demasiado grande (máx. ~2.5MB). Usa una foto más liviana`);
   }
   if (DATA_IMAGE_RE.test(value)) return value;
-  if (/^https?:\/\//i.test(value)) return value;
-  throw new AppError(
-    400,
-    `${field}: usa una imagen (PNG/JPEG/WebP) o una URL http(s)`,
-  );
+  if (/^https?:\/\//i.test(value)) {
+    throw new AppError(400, `${field}: no se permiten URLs. Sube la foto desde el dispositivo`);
+  }
+  throw new AppError(400, `${field}: solo se aceptan fotos PNG/JPEG/WebP`);
 }
 
 function historial(
@@ -178,6 +177,7 @@ export class CasosService {
         empresaId: u.empresaId,
         empresaNombre: user.empresaNombre,
         permissions: permissionsForRole(u.role),
+        esOwner: Boolean(u.esOwner),
       }));
   }
 
@@ -195,8 +195,8 @@ export class CasosService {
       throw new AppError(400, `Categoría inválida. Use: ${categorias.join(', ')}`);
     }
 
-    if (!catalogosService.isAseguradoraValida(input.aseguradora)) {
-      throw new AppError(400, 'Aseguradora no válida. Elige una del catálogo.');
+    if (!catalogosService.isAseguradoraValida(user, input.aseguradora)) {
+      throw new AppError(400, 'Cliente no válido. Elige uno del catálogo.');
     }
 
     if (!catalogosService.isCiudadValida(input.ciudad)) {
@@ -204,8 +204,10 @@ export class CasosService {
     }
 
     const aseguradoraNombre =
-      catalogoRepository.findAseguradoraByNombre(input.aseguradora)?.nombre ??
-      input.aseguradora.trim();
+      catalogoRepository.findAseguradoraByNombre(
+        requireTenantEmpresaId(user),
+        input.aseguradora,
+      )?.nombre ?? input.aseguradora.trim();
     const ciudadNombre =
       catalogoRepository.findCiudadByNombre(input.ciudad)?.nombre ?? input.ciudad.trim();
 

@@ -122,6 +122,11 @@ export class InMemoryCostoRepository implements ICostoRepository {
     this.seq += 1;
     return `${prefix}-${this.seq}-${Date.now().toString(36)}`;
   }
+
+  deleteByEmpresa(empresaId: string): void {
+    this.items = this.items.filter((i) => i.empresaId !== empresaId);
+    this.categorias = this.categorias.filter((c) => c.empresaId !== empresaId);
+  }
 }
 
 export const costoRepository = new InMemoryCostoRepository();

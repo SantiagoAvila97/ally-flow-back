@@ -16,4 +16,9 @@ router.post('/logout', (req, res) => authController.logout(req, res));
 /** GET /api/auth/me — requiere JWT (cookie o Bearer) */
 router.get('/me', authenticate, (req, res) => authController.me(req, res));
 
+/** POST /api/auth/change-password — usuario autenticado */
+router.post('/change-password', authenticate, (req, res, next) =>
+  authController.changePassword(req, res, next),
+);
+
 export default router;

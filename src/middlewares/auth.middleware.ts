@@ -62,6 +62,7 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
       empresaId: decoded.empresaId ?? null,
       empresaNombre: decoded.empresaNombre ?? null,
       permissions: decoded.permissions,
+      esOwner: Boolean(decoded.esOwner),
       exp: decoded.exp,
     };
 

@@ -116,6 +116,15 @@ export class InMemoryPlantillaPdfRepository {
     persistDeletePlantilla(id);
     return true;
   }
+
+  deleteByEmpresa(empresaId: string): number {
+    const removed = this.rows.filter((r) => r.empresaId === empresaId);
+    this.rows = this.rows.filter((r) => r.empresaId !== empresaId);
+    for (const r of removed) {
+      persistDeletePlantilla(r.id);
+    }
+    return removed.length;
+  }
 }
 
 export const plantillaPdfRepository = new InMemoryPlantillaPdfRepository();

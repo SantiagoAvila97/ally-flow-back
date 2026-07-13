@@ -27,10 +27,12 @@ export async function ensureSuperAdmin(): Promise<void> {
   const user: User = {
     id: SUPER_ADMIN_ID,
     email,
-    nombre: env.superAdminNombre || 'Super Admin',
+    nombre: env.superAdminNombre || 'SUPER ADMIN',
     passwordHash,
     role: 'SUPER_ADMIN',
     empresaId: null,
+    activo: true,
+    esOwner: false,
   };
 
   const existingById = findUserById(SUPER_ADMIN_ID);

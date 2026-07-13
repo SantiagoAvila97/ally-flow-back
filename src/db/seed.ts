@@ -41,29 +41,39 @@ export async function seedIfEmpty(): Promise<void> {
 
     for (const e of EMPRESAS_SEED) {
       await client.query(
-        `INSERT INTO empresas (id, nombre, slug) VALUES ($1, $2, $3)
+        `INSERT INTO empresas (id, nombre, slug, nit, logo_data) VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (id) DO NOTHING`,
-        [e.id, e.nombre, e.slug],
+        [e.id, e.nombre, e.slug, e.nit ?? '', e.logoDataUrl],
       );
     }
 
     for (const u of USERS_SEED) {
       await client.query(
-        `INSERT INTO users (id, email, nombre, password_hash, role, empresa_id)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO users (id, email, nombre, password_hash, role, empresa_id, activo, es_owner)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          ON CONFLICT (id) DO NOTHING`,
-        [u.id, u.email, u.nombre, u.passwordHash, u.role, u.empresaId],
+        [
+          u.id,
+          u.email,
+          u.nombre,
+          u.passwordHash,
+          u.role,
+          u.empresaId,
+          u.activo !== false,
+          Boolean(u.esOwner),
+        ],
       );
     }
 
     for (const a of ASEGURADORAS_SEED) {
       await client.query(
         `INSERT INTO aseguradoras
-          (id, nombre, nit, persona_responsable, contacto_cobros, whatsapp, activa)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+          (id, empresa_id, nombre, nit, persona_responsable, contacto_cobros, whatsapp, activa)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          ON CONFLICT (id) DO NOTHING`,
         [
           a.id,
+          a.empresaId,
           a.nombre,
           a.nit,
           a.personaResponsable,

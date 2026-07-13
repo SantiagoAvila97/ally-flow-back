@@ -48,7 +48,7 @@ export function createApp() {
   );
 
   app.use(cookieParser());
-  app.use(express.json({ limit: '2.5mb' }));
+  app.use(express.json({ limit: '4mb' }));
 
   const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,

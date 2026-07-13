@@ -6,4 +6,8 @@ export interface Empresa {
   id: string;
   nombre: string;
   slug: string;
+  /** NIT / documento tributario (obligatorio en empresas nuevas). */
+  nit: string;
+  /** Logo cuadrado 1:1 como data URL (PNG/JPEG/WEBP). */
+  logoDataUrl: string | null;
 }

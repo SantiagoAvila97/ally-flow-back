@@ -77,7 +77,7 @@ function resolveSuperAdminDefaults(): {
   if (isProdApp) {
     const email = (process.env.SUPER_ADMIN_EMAIL ?? '').trim();
     const password = process.env.SUPER_ADMIN_PASSWORD ?? '';
-    const nombre = (process.env.SUPER_ADMIN_NOMBRE ?? 'Super Admin').trim();
+    const nombre = (process.env.SUPER_ADMIN_NOMBRE ?? 'SUPER ADMIN').trim();
     if (!email || !password) {
       throw new Error(
         'APP_ENV=prod requiere SUPER_ADMIN_EMAIL y SUPER_ADMIN_PASSWORD en el entorno',
@@ -89,7 +89,7 @@ function resolveSuperAdminDefaults(): {
   return {
     email: 'superadmin.qa@allyflow.app',
     password: 'QaSuperAdmin#2026!',
-    nombre: 'Super Admin QA',
+    nombre: 'SUPER ADMIN QA',
   };
 }
 

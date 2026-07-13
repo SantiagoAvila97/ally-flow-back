@@ -1,8 +1,12 @@
+import { EMPRESA_DEMO } from './empresas.seed';
+
 /**
- * Catálogo de aseguradoras (mock in-memory).
+ * Clientes del tenant (antes “aseguradoras”).
+ * Seed solo para DEMO — Full Soluciones y tenants nuevos arrancan vacíos (como tarifas).
  */
 export interface AseguradoraSeed {
   id: string;
+  empresaId: string;
   nombre: string;
   nit: string | null;
   personaResponsable: string | null;
@@ -11,9 +15,8 @@ export interface AseguradoraSeed {
   activa: boolean;
 }
 
-export const ASEGURADORAS_SEED: AseguradoraSeed[] = [
+const DEMO_CLIENTES: Omit<AseguradoraSeed, 'id' | 'empresaId'>[] = [
   {
-    id: 'aseg-sura',
     nombre: 'Sura Seguros',
     nit: '890903407',
     personaResponsable: 'Ana Gómez',
@@ -22,7 +25,6 @@ export const ASEGURADORAS_SEED: AseguradoraSeed[] = [
     activa: true,
   },
   {
-    id: 'aseg-liberty',
     nombre: 'Liberty Seguros',
     nit: '860031532',
     personaResponsable: 'Carlos Ruiz',
@@ -31,7 +33,6 @@ export const ASEGURADORAS_SEED: AseguradoraSeed[] = [
     activa: true,
   },
   {
-    id: 'aseg-mapfre',
     nombre: 'Mapfre Colombia',
     nit: '891100912',
     personaResponsable: null,
@@ -40,7 +41,6 @@ export const ASEGURADORAS_SEED: AseguradoraSeed[] = [
     activa: true,
   },
   {
-    id: 'aseg-bolivar',
     nombre: 'Bolívar Seguros',
     nit: '860002180',
     personaResponsable: 'Laura Méndez',
@@ -49,7 +49,6 @@ export const ASEGURADORAS_SEED: AseguradoraSeed[] = [
     activa: true,
   },
   {
-    id: 'aseg-pacifico',
     nombre: 'Seguros del Pacífico S.A.',
     nit: null,
     personaResponsable: null,
@@ -58,7 +57,6 @@ export const ASEGURADORAS_SEED: AseguradoraSeed[] = [
     activa: true,
   },
   {
-    id: 'aseg-allianz',
     nombre: 'Allianz Seguros',
     nit: '860002503',
     personaResponsable: null,
@@ -67,7 +65,6 @@ export const ASEGURADORAS_SEED: AseguradoraSeed[] = [
     activa: true,
   },
   {
-    id: 'aseg-axa',
     nombre: 'AXA Colpatria',
     nit: '860002184',
     personaResponsable: null,
@@ -76,7 +73,6 @@ export const ASEGURADORAS_SEED: AseguradoraSeed[] = [
     activa: true,
   },
   {
-    id: 'aseg-equidad',
     nombre: 'Equidad Seguros',
     nit: null,
     personaResponsable: null,
@@ -85,7 +81,6 @@ export const ASEGURADORAS_SEED: AseguradoraSeed[] = [
     activa: true,
   },
   {
-    id: 'aseg-estado',
     nombre: 'Estado Seguros',
     nit: null,
     personaResponsable: null,
@@ -94,7 +89,6 @@ export const ASEGURADORAS_SEED: AseguradoraSeed[] = [
     activa: true,
   },
   {
-    id: 'aseg-previsora',
     nombre: 'Previsora Seguros',
     nit: '860002400',
     personaResponsable: null,
@@ -103,3 +97,20 @@ export const ASEGURADORAS_SEED: AseguradoraSeed[] = [
     activa: true,
   },
 ];
+
+function slug(nombre: string): string {
+  return nombre
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 24);
+}
+
+/** Solo tenant DEMO. */
+export const ASEGURADORAS_SEED: AseguradoraSeed[] = DEMO_CLIENTES.map((c) => ({
+  ...c,
+  id: `aseg-demo-${slug(c.nombre)}`,
+  empresaId: EMPRESA_DEMO,
+}));

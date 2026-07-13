@@ -13,13 +13,56 @@ function money(n: number): string {
   }).format(n);
 }
 
+/** LETTER: 612×792. Logo arriba a la derecha. */
+const PAGE_RIGHT = 612 - 50;
+const LOGO_SIZE = 56;
+const LOGO_X = PAGE_RIGHT - LOGO_SIZE;
+const LOGO_Y = 42;
+
+function dataUrlToBuffer(dataUrl: string | null | undefined): Buffer | null {
+  if (!dataUrl) return null;
+  const m = /^data:image\/(png|jpeg|jpg|webp);base64,([A-Za-z0-9+/=]+)$/i.exec(dataUrl.trim());
+  if (!m?.[2]) return null;
+  try {
+    return Buffer.from(m[2], 'base64');
+  } catch {
+    return null;
+  }
+}
+
+/** Dibuja el logo de la empresa en la esquina superior derecha (si existe). */
+function drawEmpresaLogo(
+  doc: PDFKit.PDFDocument,
+  logoDataUrl: string | null | undefined,
+): void {
+  const buf = dataUrlToBuffer(logoDataUrl);
+  if (!buf) return;
+  try {
+    doc.image(buf, LOGO_X, LOGO_Y, {
+      width: LOGO_SIZE,
+      height: LOGO_SIZE,
+      fit: [LOGO_SIZE, LOGO_SIZE],
+      align: 'center',
+      valign: 'center',
+    });
+  } catch {
+    // Logo inválido: no tumba el PDF
+  }
+}
+
+export interface BuildCobroPdfOptions {
+  /** Logo 1:1 de la empresa (data URL). Se coloca arriba a la derecha. */
+  logoDataUrl?: string | null;
+}
+
 /**
- * Genera el PDF de cobro según plantilla de la empresa.
- * Cabecera unificada; extras opcionales por aseguradora.
+ * PDF de cobro unificado (estilo Full Soluciones / tabla operativa).
+ * Color de acento configurable por plantilla; mismos layout para todos los tenants.
  */
 export function buildDocumentoCobroPdf(
   caso: Caso,
   plantilla: PlantillaPdfCobro,
+  options: BuildCobroPdfOptions = {},
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 50, size: 'LETTER' });
@@ -28,12 +71,7 @@ export function buildDocumentoCobroPdf(
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    if (plantilla.tipoPlantilla === 'carta_siniestro') {
-      renderCartaSiniestro(doc, caso, plantilla);
-    } else {
-      renderTablaOperativa(doc, caso, plantilla);
-    }
-
+    renderDocumentoCobro(doc, caso, plantilla, options.logoDataUrl ?? null);
     doc.end();
   });
 }
@@ -58,37 +96,41 @@ function renderExtrasBlock(
   }
 }
 
-function renderTablaOperativa(
+function renderDocumentoCobro(
   doc: PDFKit.PDFDocument,
   caso: Caso,
   p: PlantillaPdfCobro,
+  logoDataUrl: string | null,
 ): void {
   const accent = p.colorAcento || '#0f766e';
   const total = caso.lineasCobro.reduce(
     (s, l) => s + l.cantidad * l.precioUnitario,
     0,
   );
+  const headerTextWidth = logoDataUrl ? LOGO_X - 50 - 12 : 512;
 
-  doc.rect(50, 40, 512, 6).fill(accent);
+  doc.rect(50, 40, 512, 2).fill(accent);
+
+  drawEmpresaLogo(doc, logoDataUrl);
 
   doc
     .fillColor('#071422')
     .fontSize(18)
     .font('Helvetica-Bold')
-    .text(p.razonSocial, 50, 55);
+    .text(p.razonSocial, 50, 55, { width: headerTextWidth });
   doc
     .fontSize(9)
     .font('Helvetica')
     .fillColor('#475569')
-    .text(`NIT ${p.nit} · ${p.ciudad} · ${p.telefono}`)
-    .text(p.email);
+    .text(`NIT ${p.nit} · ${p.ciudad} · ${p.telefono}`, { width: headerTextWidth })
+    .text(p.email, { width: headerTextWidth });
 
   doc
     .moveDown(1.2)
     .fontSize(14)
     .fillColor(accent)
     .font('Helvetica-Bold')
-    .text(p.textoHeader || 'Documento de cobro operativo');
+    .text(p.textoHeader || 'Factura para cobro');
 
   doc
     .moveDown(0.6)
@@ -142,85 +184,6 @@ function renderTablaOperativa(
 
   doc
     .font('Helvetica')
-    .fontSize(8)
-    .fillColor('#64748b')
-    .text(p.textoFooter, 50, 720, { width: 512, align: 'center' });
-}
-
-function renderCartaSiniestro(
-  doc: PDFKit.PDFDocument,
-  caso: Caso,
-  p: PlantillaPdfCobro,
-): void {
-  const accent = p.colorAcento || '#1e3a5f';
-  const total = caso.lineasCobro.reduce(
-    (s, l) => s + l.cantidad * l.precioUnitario,
-    0,
-  );
-
-  doc
-    .fillColor(accent)
-    .fontSize(20)
-    .font('Helvetica-Bold')
-    .text(p.razonSocial, { align: 'center' });
-  doc
-    .fontSize(9)
-    .font('Helvetica')
-    .fillColor('#475569')
-    .text(`NIT ${p.nit} · ${p.ciudad}`, { align: 'center' })
-    .text(`${p.telefono} · ${p.email}`, { align: 'center' });
-
-  doc
-    .moveDown(1.5)
-    .fontSize(13)
-    .fillColor(accent)
-    .font('Helvetica-Bold')
-    .text(p.textoHeader || 'Liquidacion de honorarios / reclamo', {
-      align: 'center',
-    });
-
-  doc.moveDown(1.2).fontSize(10).fillColor('#071422').font('Helvetica');
-  doc.text('Datos del siniestro / servicio', { underline: true });
-  doc.moveDown(0.4);
-  doc.text(`Nº siniestro / aseguradora: ${caso.numeroAseguradora}`);
-  doc.text(`Aseguradora: ${caso.aseguradora}`);
-  doc.text(`Asegurado / titular: ${caso.titularNombre}`);
-  doc.text(`Teléfono: ${caso.titularTelefono}`);
-  doc.text(`Dirección del servicio: ${caso.direccion}, ${caso.ciudad}`);
-  doc.text(`Categoría de servicio: ${caso.categoriaServicio}`);
-  doc.text(`Referencia interna: ${caso.id}`);
-  doc.text(`Fecha de emisión: ${new Date().toLocaleDateString('es-CO')}`);
-
-  renderExtrasBlock(doc, p);
-
-  doc.moveDown(1.2).font('Helvetica-Bold').text('Detalle de honorarios');
-  doc.moveDown(0.4).font('Helvetica');
-
-  caso.lineasCobro.forEach((l, i) => {
-    const sub = l.cantidad * l.precioUnitario;
-    doc.text(
-      `${i + 1}. ${l.nombre} — ${l.cantidad} ${l.unidad} × ${money(l.precioUnitario)} = ${money(sub)}`,
-    );
-  });
-
-  doc
-    .moveDown(1)
-    .font('Helvetica-Bold')
-    .fontSize(12)
-    .fillColor(accent)
-    .text(`Valor total a reclamar: ${money(total)}`);
-
-  doc
-    .moveDown(1.5)
-    .fontSize(9)
-    .font('Helvetica')
-    .fillColor('#334155')
-    .text(
-      'Se solicita a la aseguradora la confirmación de este documento y la gestión del pago correspondiente a los honorarios/servicios descritos.',
-      { align: 'justify' },
-    );
-
-  doc
     .fontSize(8)
     .fillColor('#64748b')
     .text(p.textoFooter, 50, 720, { width: 512, align: 'center' });

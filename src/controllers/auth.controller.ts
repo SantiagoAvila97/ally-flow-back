@@ -51,6 +51,29 @@ export class AuthController {
   me(req: Request, res: Response): void {
     res.json({ user: req.user });
   }
+
+  async changePassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const parsed = z
+        .object({
+          currentPassword: z.string().min(1),
+          newPassword: z.string().min(8),
+        })
+        .safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ message: 'Datos inválidos' });
+        return;
+      }
+      await authService.changePassword(
+        req.user!.id,
+        parsed.data.currentPassword,
+        parsed.data.newPassword,
+      );
+      res.json({ ok: true });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 export const authController = new AuthController();

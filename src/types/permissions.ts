@@ -8,11 +8,18 @@ export type Permission =
   | 'admin:tarifas'
   | 'admin:catalogos'
   | 'balance:ver'
-  | 'tenant:acceso';
+  | 'tenant:acceso'
+  | 'usuarios:gestionar';
 
 const EXTRA_BY_ROLE: Record<Role, readonly Permission[]> = {
-  SUPER_ADMIN: ['suite:empresas'],
-  ADMIN: ['tenant:acceso', 'admin:tarifas', 'admin:catalogos', 'balance:ver'],
+  SUPER_ADMIN: ['suite:empresas', 'usuarios:gestionar'],
+  ADMIN: [
+    'tenant:acceso',
+    'admin:tarifas',
+    'admin:catalogos',
+    'balance:ver',
+    'usuarios:gestionar',
+  ],
   ASESOR: ['tenant:acceso', 'balance:ver'],
   TECNICO: ['tenant:acceso'],
 };

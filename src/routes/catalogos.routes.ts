@@ -6,7 +6,7 @@ import { requireRoles, requireTenant } from '../middlewares/role.middleware';
 /**
  * Catálogos de referencia.
  * Lectura: usuarios de tenant autenticados.
- * Mutaciones: solo ADMIN de la empresa (aseguradoras son globales hoy — solo ADMIN).
+ * Mutaciones: solo ADMIN. Clientes (catálogo) son por empresa, como tarifas.
  */
 const router = Router();
 

@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
+import { findEmpresaById } from '../data/empresas.seed';
 import { costosService } from '../services/costos.service';
 import { casosService } from '../services/casos.service';
 import { buildDocumentoCobroPdf } from '../services/pdf-cobro.service';
@@ -25,17 +26,15 @@ const asignarSchema = z.object({
   tecnicoId: z.string().min(1),
 });
 
-const MAX_MEDIA = 2_000_000;
+const MAX_MEDIA = 2_500_000;
+/** Solo fotos/firmas embebidas (dataURL). No se aceptan URLs externas. */
 const mediaUrl = z
   .string()
   .min(1)
   .max(MAX_MEDIA)
-  .refine(
-    (v) =>
-      /^data:image\/(png|jpeg|jpg|webp);base64,/i.test(v) ||
-      /^https?:\/\//i.test(v),
-    { message: 'Media inválida: usa dataURL de imagen o URL http(s)' },
-  );
+  .refine((v) => /^data:image\/(png|jpeg|jpg|webp);base64,/i.test(v), {
+    message: 'Solo se aceptan fotos (imagen PNG/JPEG/WebP). No uses URLs',
+  });
 
 const fotoSchema = z.object({
   url: mediaUrl,
@@ -277,7 +276,8 @@ export class CasosController {
         caso.aseguradora,
       );
 
-      const pdf = await buildDocumentoCobroPdf(caso, plantilla);
+      const logoDataUrl = findEmpresaById(caso.empresaId)?.logoDataUrl ?? null;
+      const pdf = await buildDocumentoCobroPdf(caso, plantilla, { logoDataUrl });
       if (caso.estado === 'PendienteDocumentoCobro') {
         casosService.marcarDocumentoGenerado(caso.id, req.user!);
       }

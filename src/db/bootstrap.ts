@@ -9,6 +9,8 @@ import { hasDatabase } from './pool';
 import { migrate } from './migrate';
 import { seedIfEmpty } from './seed';
 import { ensureSuperAdmin } from './ensure-super-admin';
+import { ensureTenantOwners } from './ensure-tenant-owners';
+import { ensureEmpresaLogos } from './ensure-empresa-logos';
 import { loadAllFromDb } from './hydrate';
 import { enablePersistence } from './persist';
 
@@ -20,6 +22,8 @@ export async function bootstrapDatabase(): Promise<void> {
   if (!hasDatabase()) {
     console.log(`[db] no DATABASE_URL — in-memory (${env.appEnv})`);
     await ensureSuperAdmin();
+    await ensureTenantOwners();
+    await ensureEmpresaLogos();
     return;
   }
 
@@ -37,8 +41,9 @@ export async function bootstrapDatabase(): Promise<void> {
   plantillaPdfRepository.hydrate(data.plantillas);
   casoRepository.hydrate(data.casos);
 
-  // Tras hydrate, re-asegura en store por si el insert no estaba en el snapshot.
   await ensureSuperAdmin();
+  await ensureTenantOwners();
+  await ensureEmpresaLogos();
 
   console.log(
     `[db] ready — empresas=${data.empresas.length} users=${data.users.length} casos=${data.casos.length}`,

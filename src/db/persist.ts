@@ -200,9 +200,10 @@ export async function upsertAseguradora(a: Aseguradora): Promise<void> {
   if (!hasDatabase()) return;
   await getPool().query(
     `INSERT INTO aseguradoras
-      (id, nombre, nit, persona_responsable, contacto_cobros, whatsapp, activa)
-     VALUES ($1,$2,$3,$4,$5,$6,$7)
+      (id, empresa_id, nombre, nit, persona_responsable, contacto_cobros, whatsapp, activa)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
      ON CONFLICT (id) DO UPDATE SET
+      empresa_id = EXCLUDED.empresa_id,
       nombre = EXCLUDED.nombre,
       nit = EXCLUDED.nit,
       persona_responsable = EXCLUDED.persona_responsable,
@@ -211,6 +212,7 @@ export async function upsertAseguradora(a: Aseguradora): Promise<void> {
       activa = EXCLUDED.activa`,
     [
       a.id,
+      a.empresaId,
       a.nombre,
       a.nit,
       a.personaResponsable,
@@ -322,16 +324,28 @@ export async function upsertEmpresa(e: {
   id: string;
   nombre: string;
   slug: string;
+  nit?: string;
+  logoDataUrl?: string | null;
 }): Promise<void> {
   if (!hasDatabase()) return;
   await getPool().query(
-    `INSERT INTO empresas (id, nombre, slug) VALUES ($1,$2,$3)
-     ON CONFLICT (id) DO UPDATE SET nombre = EXCLUDED.nombre, slug = EXCLUDED.slug`,
-    [e.id, e.nombre, e.slug],
+    `INSERT INTO empresas (id, nombre, slug, nit, logo_data) VALUES ($1,$2,$3,$4,$5)
+     ON CONFLICT (id) DO UPDATE SET
+       nombre = EXCLUDED.nombre,
+       slug = EXCLUDED.slug,
+       nit = EXCLUDED.nit,
+       logo_data = EXCLUDED.logo_data`,
+    [e.id, e.nombre, e.slug, e.nit ?? '', e.logoDataUrl ?? null],
   );
 }
 
-export function persistEmpresa(e: { id: string; nombre: string; slug: string }): void {
+export function persistEmpresa(e: {
+  id: string;
+  nombre: string;
+  slug: string;
+  nit?: string;
+  logoDataUrl?: string | null;
+}): void {
   if (runtimeOnly()) return;
   fireAndForget(upsertEmpresa(e), 'empresa');
 }
@@ -343,18 +357,24 @@ export async function upsertUser(u: {
   passwordHash: string;
   role: string;
   empresaId: string | null;
+  activo?: boolean;
+  esOwner?: boolean;
 }): Promise<void> {
   if (!hasDatabase()) return;
+  const activo = u.activo !== false;
+  const esOwner = Boolean(u.esOwner);
   await getPool().query(
-    `INSERT INTO users (id, email, nombre, password_hash, role, empresa_id)
-     VALUES ($1,$2,$3,$4,$5,$6)
+    `INSERT INTO users (id, email, nombre, password_hash, role, empresa_id, activo, es_owner)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
      ON CONFLICT (id) DO UPDATE SET
        email = EXCLUDED.email,
        nombre = EXCLUDED.nombre,
        password_hash = EXCLUDED.password_hash,
        role = EXCLUDED.role,
-       empresa_id = EXCLUDED.empresa_id`,
-    [u.id, u.email, u.nombre, u.passwordHash, u.role, u.empresaId],
+       empresa_id = EXCLUDED.empresa_id,
+       activo = EXCLUDED.activo,
+       es_owner = EXCLUDED.es_owner`,
+    [u.id, u.email, u.nombre, u.passwordHash, u.role, u.empresaId, activo, esOwner],
   );
 }
 
@@ -365,8 +385,38 @@ export function persistUser(u: {
   passwordHash: string;
   role: string;
   empresaId: string | null;
+  activo?: boolean;
+  esOwner?: boolean;
 }): void {
   if (runtimeOnly()) return;
   fireAndForget(upsertUser(u), 'user');
+}
+
+/** Borrado total de un tenant y dependencias (solo QA/local vía service). */
+export async function deleteEmpresaCascade(empresaId: string): Promise<void> {
+  if (!hasDatabase()) return;
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('DELETE FROM casos WHERE empresa_id = $1', [empresaId]);
+    await client.query('DELETE FROM items_costo WHERE empresa_id = $1', [empresaId]);
+    await client.query('DELETE FROM categorias_costo WHERE empresa_id = $1', [empresaId]);
+    await client.query('DELETE FROM plantillas_pdf WHERE empresa_id = $1', [empresaId]);
+    await client.query('DELETE FROM aseguradoras WHERE empresa_id = $1', [empresaId]);
+    await client.query('DELETE FROM users WHERE empresa_id = $1', [empresaId]);
+    await client.query('DELETE FROM empresas WHERE id = $1', [empresaId]);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+export function persistDeleteEmpresaCascade(empresaId: string): void {
+  if (runtimeOnly()) return;
+  fireAndForget(deleteEmpresaCascade(empresaId), 'delete-empresa');
 }
 

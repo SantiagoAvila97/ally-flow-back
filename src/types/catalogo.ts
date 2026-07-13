@@ -1,5 +1,7 @@
 export interface Aseguradora {
   id: string;
+  /** Tenant dueño del cliente (independiente por empresa). */
+  empresaId: string;
   nombre: string;
   nit: string | null;
   /** Persona responsable / contacto general */

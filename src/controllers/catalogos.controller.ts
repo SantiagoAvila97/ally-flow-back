@@ -35,7 +35,7 @@ export class CatalogosController {
   listAseguradoras(req: Request, res: Response, next: NextFunction): void {
     try {
       const all = req.query.all === '1' || req.query.all === 'true';
-      res.json({ data: catalogosService.listAseguradoras(!all) });
+      res.json({ data: catalogosService.listAseguradoras(req.user!, !all) });
     } catch (err) {
       next(err);
     }
@@ -48,7 +48,7 @@ export class CatalogosController {
         res.status(400).json({ message: 'Datos inválidos', issues: parsed.error.issues });
         return;
       }
-      const row = catalogosService.createAseguradora(parsed.data);
+      const row = catalogosService.createAseguradora(req.user!, parsed.data);
       res.status(201).json({ data: row });
     } catch (err) {
       next(err);
@@ -62,7 +62,7 @@ export class CatalogosController {
         res.status(400).json({ message: 'Datos inválidos', issues: parsed.error.issues });
         return;
       }
-      const row = catalogosService.updateAseguradora(req.params.id, parsed.data);
+      const row = catalogosService.updateAseguradora(req.user!, req.params.id, parsed.data);
       res.json({ data: row });
     } catch (err) {
       next(err);
@@ -71,7 +71,7 @@ export class CatalogosController {
 
   deleteAseguradora(req: Request, res: Response, next: NextFunction): void {
     try {
-      catalogosService.deleteAseguradora(req.params.id);
+      catalogosService.deleteAseguradora(req.user!, req.params.id);
       res.status(204).send();
     } catch (err) {
       next(err);
