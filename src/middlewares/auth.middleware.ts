@@ -2,21 +2,34 @@ import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
 import type { JwtPayload } from '../types/user';
+import { permissionsMatchRole } from '../types/permissions';
 import { isRole, isSuperAdmin } from '../types/roles';
+import { AUTH_COOKIE } from '../utils/auth-cookie';
+
+function extractToken(req: Request): string | null {
+  const header = req.headers.authorization;
+  if (header?.startsWith('Bearer ')) {
+    const bearer = header.slice(7).trim();
+    if (bearer) return bearer;
+  }
+  const fromCookie = req.cookies?.[AUTH_COOKIE];
+  if (typeof fromCookie === 'string' && fromCookie.trim()) {
+    return fromCookie.trim();
+  }
+  return null;
+}
 
 /**
- * Middleware de autenticación JWT (HS256, iss/aud, exp).
- * SUPER_ADMIN puede no tener empresaId.
+ * Autenticación JWT (HS256, iss/aud, exp, permissions).
+ * Cookie httpOnly o Authorization: Bearer (tools / legacy).
  */
 export function authenticate(req: Request, res: Response, next: NextFunction): void {
-  const header = req.headers.authorization;
+  const token = extractToken(req);
 
-  if (!header?.startsWith('Bearer ')) {
+  if (!token) {
     res.status(401).json({ message: 'Token de autenticación requerido' });
     return;
   }
-
-  const token = header.slice(7);
 
   try {
     const decoded = jwt.verify(token, env.jwtSecret, {
@@ -27,6 +40,11 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
     }) as JwtPayload;
 
     if (!decoded.sub || !decoded.email || !isRole(decoded.role)) {
+      res.status(401).json({ message: 'Token con claims inválidos' });
+      return;
+    }
+
+    if (!permissionsMatchRole(decoded.role, decoded.permissions)) {
       res.status(401).json({ message: 'Token con claims inválidos' });
       return;
     }
@@ -43,6 +61,8 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
       role: decoded.role,
       empresaId: decoded.empresaId ?? null,
       empresaNombre: decoded.empresaNombre ?? null,
+      permissions: decoded.permissions,
+      exp: decoded.exp,
     };
 
     next();

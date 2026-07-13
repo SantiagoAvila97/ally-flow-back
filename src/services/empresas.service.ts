@@ -10,6 +10,7 @@ import { plantillaPdfRepository } from '../repositories/plantilla-pdf.repository
 import { AppError } from '../middlewares/error.middleware';
 import type { Empresa } from '../types/empresa';
 import type { User } from '../types/user';
+import { titleCaseWords } from '../utils/text';
 
 function slugify(raw: string): string {
   return raw
@@ -40,9 +41,9 @@ export class EmpresasService {
   }
 
   async create(input: CreateEmpresaInput): Promise<CreateEmpresaResult> {
-    const nombre = input.nombre?.trim();
+    const nombre = titleCaseWords(input.nombre ?? '');
     const adminEmail = input.adminEmail?.trim().toLowerCase();
-    const adminNombre = input.adminNombre?.trim();
+    const adminNombre = titleCaseWords(input.adminNombre ?? '');
     const adminPassword = input.adminPassword ?? '';
 
     if (!nombre || nombre.length < 2) {

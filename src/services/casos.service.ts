@@ -2,6 +2,7 @@ import { AppError } from '../middlewares/error.middleware';
 import { getCategoriasForEmpresa } from '../data/categorias.seed';
 import { findUserById, listUsersByEmpresa, USERS_SEED } from '../data/users.seed';
 import { casoRepository, type ICasoRepository } from '../repositories/caso.repository';
+import { catalogoRepository } from '../repositories/catalogo.repository';
 import { catalogosService } from './catalogos.service';
 import type { Caso, CrearCasoInput, EstadoCaso, HistorialCambio, LineaCobro } from '../types/caso';
 import { ESTADOS_CASO, ESTADOS_OCULTOS_TECNICO } from '../types/caso';
@@ -9,7 +10,9 @@ import type { ListCasosQuery, PaginatedResult } from '../types/pagination';
 import { paginate } from '../types/pagination';
 import type { PublicUser } from '../types/user';
 import { assertCasoAction } from '../types/caso-permissions';
+import { permissionsForRole } from '../types/permissions';
 import { requireTenantEmpresaId } from './tenant-scope';
+import { titleCaseWords } from '../utils/text';
 
 /** ~2MB de texto; cubre dataURL de foto/firma razonable. */
 const MAX_MEDIA_CHARS = 2_000_000;
@@ -174,6 +177,7 @@ export class CasosService {
         role: u.role,
         empresaId: u.empresaId,
         empresaNombre: user.empresaNombre,
+        permissions: permissionsForRole(u.role),
       }));
   }
 
@@ -199,6 +203,12 @@ export class CasosService {
       throw new AppError(400, 'Ciudad no válida. Elige una del catálogo.');
     }
 
+    const aseguradoraNombre =
+      catalogoRepository.findAseguradoraByNombre(input.aseguradora)?.nombre ??
+      input.aseguradora.trim();
+    const ciudadNombre =
+      catalogoRepository.findCiudadByNombre(input.ciudad)?.nombre ?? input.ciudad.trim();
+
     const now = new Date().toISOString();
     const id =
       typeof (this.repo as typeof casoRepository).nextId === 'function'
@@ -215,19 +225,19 @@ export class CasosService {
 
     const caso: Caso = {
       id,
-      titulo: input.titulo.trim(),
+      titulo: titleCaseWords(input.titulo),
       descripcion: (input.descripcion ?? input.observaciones ?? '').trim(),
-      cliente: input.aseguradora.trim(),
+      cliente: aseguradoraNombre,
       estado: 'PendienteAsignacion',
       empresaId: requireTenantEmpresaId(user),
       asesorId,
       tecnicoId: null,
       numeroAseguradora: input.numeroAseguradora.trim(),
-      aseguradora: input.aseguradora.trim(),
-      titularNombre: input.titularNombre.trim(),
+      aseguradora: aseguradoraNombre,
+      titularNombre: titleCaseWords(input.titularNombre),
       titularTelefono: input.titularTelefono.trim(),
-      direccion: input.direccion.trim(),
-      ciudad: input.ciudad.trim(),
+      direccion: titleCaseWords(input.direccion),
+      ciudad: ciudadNombre,
       lat: input.lat ?? null,
       lon: input.lon ?? null,
       direccionNormalizada: (input.direccionNormalizada ?? '').trim() || null,
@@ -416,7 +426,7 @@ export class CasosService {
       if (l.precioUnitario < 0) throw new AppError(400, 'Precio inválido');
       return {
         itemCostoId: l.itemCostoId ?? null,
-        nombre: l.nombre.trim(),
+        nombre: titleCaseWords(l.nombre),
         unidad: (l.unidad || 'und').trim(),
         cantidad: Number(l.cantidad),
         precioUnitario: Number(l.precioUnitario),

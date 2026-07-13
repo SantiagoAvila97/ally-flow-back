@@ -1,32 +1,53 @@
 import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
 import { authService } from '../services/auth.service';
+import { clearAuthCookie, setAuthCookie } from '../utils/auth-cookie';
+import { getLoginPublicKeyPem } from '../utils/auth-crypto';
+import { decryptLoginEnvelope } from '../utils/login-envelope';
 
-const loginSchema = z.object({
-  email: z.string().email('Email inválido'),
-  password: z.string().min(1, 'Password requerido'),
+/** Login cifrado: Network no muestra email/password en claro. */
+const loginEncryptedSchema = z.object({
+  ek: z.string().min(1),
+  iv: z.string().min(1),
+  ct: z.string().min(1),
 });
 
 export class AuthController {
+  publicKey(_req: Request, res: Response): void {
+    res.json({
+      alg: 'RSA-OAEP-256',
+      publicKey: getLoginPublicKeyPem(),
+    });
+  }
+
   async login(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const parsed = loginSchema.safeParse(req.body);
+      const parsed = loginEncryptedSchema.safeParse(req.body);
       if (!parsed.success) {
         res.status(400).json({
-          message: 'Datos de login inválidos',
+          message:
+            'Login requiere payload cifrado (ek, iv, ct). Actualiza el cliente.',
           errors: parsed.error.flatten().fieldErrors,
         });
         return;
       }
 
-      const result = await authService.login(parsed.data.email, parsed.data.password);
-      res.json(result);
+      const { email, password } = decryptLoginEnvelope(parsed.data);
+
+      const result = await authService.login(email, password);
+
+      setAuthCookie(res, result.token);
+      res.json({ user: result.user });
     } catch (err) {
       next(err);
     }
   }
 
-  /** Endpoint útil para el frontend: valida token y devuelve el usuario actual. */
+  logout(_req: Request, res: Response): void {
+    clearAuthCookie(res);
+    res.json({ ok: true });
+  }
+
   me(req: Request, res: Response): void {
     res.json({ user: req.user });
   }

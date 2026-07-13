@@ -7,6 +7,7 @@ import {
   persistDeleteCiudad,
 } from '../db/persist';
 import type { Aseguradora, CiudadCatalogo } from '../types/catalogo';
+import { titleCaseWords } from '../utils/text';
 
 export interface CreateAseguradoraInput {
   nombre: string;
@@ -147,9 +148,10 @@ export class InMemoryCatalogoRepository implements ICatalogoRepository {
   }
 
   createCiudad(input: CreateCiudadInput): CiudadCatalogo {
+    const nombre = titleCaseWords(input.nombre);
     const row: CiudadCatalogo = {
-      id: slugId('ciudad', input.nombre),
-      nombre: input.nombre.trim(),
+      id: slugId('ciudad', nombre),
+      nombre,
       area: (input.area ?? 'bogota-area').trim() || 'bogota-area',
       activa: input.activa ?? true,
     };
@@ -161,7 +163,7 @@ export class InMemoryCatalogoRepository implements ICatalogoRepository {
   updateCiudad(id: string, input: UpdateCiudadInput): CiudadCatalogo | undefined {
     const row = this.findCiudadById(id);
     if (!row) return undefined;
-    if (input.nombre !== undefined) row.nombre = input.nombre.trim();
+    if (input.nombre !== undefined) row.nombre = titleCaseWords(input.nombre);
     if (input.area !== undefined) row.area = input.area.trim() || row.area;
     if (input.activa !== undefined) row.activa = input.activa;
     persistCiudad(row);

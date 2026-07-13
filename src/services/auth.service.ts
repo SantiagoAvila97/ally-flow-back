@@ -3,6 +3,7 @@ import { findUserByEmail } from '../data/users.seed';
 import { env } from '../config/env';
 import { AppError } from '../middlewares/error.middleware';
 import type { JwtPayload, PublicUser } from '../types/user';
+import { permissionsForRole } from '../types/permissions';
 import { isSuperAdmin } from '../types/roles';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -14,18 +15,19 @@ export interface LoginResult {
 
 export class AuthService {
   /**
-   * Valida credenciales y emite JWT con claims de rol + tenant (empresa).
+   * Valida credenciales y emite JWT con claims de rol + permisos + tenant.
    * SUPER_ADMIN: sin empresa.
    */
   async login(email: string, password: string): Promise<LoginResult> {
-    const user = findUserByEmail(email);
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = findUserByEmail(normalizedEmail);
     if (!user) {
-      throw new AppError(401, 'Credenciales inválidas');
+      throw new AppError(401, 'El usuario no existe');
     }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
-      throw new AppError(401, 'Credenciales inválidas');
+      throw new AppError(401, 'Contraseña incorrecta');
     }
 
     let empresaId: string | null = null;
@@ -46,14 +48,7 @@ export class AuthService {
       empresaNombre = empresa.nombre;
     }
 
-    const publicUser: PublicUser = {
-      id: user.id,
-      email: user.email,
-      nombre: user.nombre,
-      role: user.role,
-      empresaId,
-      empresaNombre,
-    };
+    const permissions = permissionsForRole(user.role);
 
     const payload: JwtPayload = {
       sub: user.id,
@@ -62,6 +57,7 @@ export class AuthService {
       role: user.role,
       empresaId,
       empresaNombre,
+      permissions,
     };
 
     const token = jwt.sign(payload, env.jwtSecret, {
@@ -70,6 +66,19 @@ export class AuthService {
       issuer: env.jwtIssuer,
       audience: env.jwtAudience,
     });
+
+    const decoded = jwt.decode(token) as JwtPayload | null;
+
+    const publicUser: PublicUser = {
+      id: user.id,
+      email: user.email,
+      nombre: user.nombre,
+      role: user.role,
+      empresaId,
+      empresaNombre,
+      permissions,
+      exp: decoded?.exp,
+    };
 
     return { token, user: publicUser };
   }

@@ -21,11 +21,24 @@ function resolveJwtSecret(): string {
 }
 
 function resolveCorsOrigins(): string[] {
-  const raw = process.env.CORS_ORIGIN ?? 'http://localhost:4200';
-  return raw
+  const raw = process.env.CORS_ORIGIN ?? '';
+  const fromEnv = raw
     .split(',')
     .map((s) => s.trim().replace(/\/$/, ''))
     .filter(Boolean);
+
+  // ng serve local → API QA/PROD: siempre permitir localhost fuera de prod estricto.
+  // En prod solo lo que venga en CORS_ORIGIN (front de Vercel).
+  const localDev =
+    appEnv === 'prod'
+      ? []
+      : ['http://localhost:4200', 'http://127.0.0.1:4200'];
+
+  const merged = [...new Set([...fromEnv, ...localDev])];
+  if (merged.length === 0) {
+    return ['http://localhost:4200'];
+  }
+  return merged;
 }
 
 /** Defaults distintos QA vs PROD (override con SUPER_ADMIN_* en Railway). */

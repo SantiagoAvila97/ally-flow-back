@@ -9,6 +9,7 @@ import {
 import type { Aseguradora, CatalogosPayload, CiudadCatalogo } from '../types/catalogo';
 import type { PublicUser } from '../types/user';
 import { requireTenantEmpresaId } from './tenant-scope';
+import { titleCaseWords } from '../utils/text';
 
 export class CatalogosService {
   constructor(private readonly repo: ICatalogoRepository = catalogoRepository) {}
@@ -39,7 +40,7 @@ export class CatalogosService {
   }
 
   createAseguradora(input: CreateAseguradoraInput): Aseguradora {
-    const nombre = input.nombre?.trim();
+    const nombre = titleCaseWords(input.nombre ?? '');
     if (!nombre || nombre.length < 2) {
       throw new AppError(400, 'Nombre de aseguradora requerido');
     }
@@ -47,20 +48,33 @@ export class CatalogosService {
       .listAseguradoras(false)
       .find((a) => a.nombre.toLowerCase() === nombre.toLowerCase());
     if (dup) throw new AppError(409, 'Ya existe una aseguradora con ese nombre');
-    return this.repo.createAseguradora({ ...input, nombre });
+    return this.repo.createAseguradora({
+      ...input,
+      nombre,
+      personaResponsable: input.personaResponsable
+        ? titleCaseWords(input.personaResponsable)
+        : input.personaResponsable,
+    });
   }
 
   updateAseguradora(id: string, input: UpdateAseguradoraInput): Aseguradora {
+    let next = { ...input };
     if (input.nombre !== undefined) {
-      const nombre = input.nombre.trim();
+      const nombre = titleCaseWords(input.nombre);
       if (nombre.length < 2) throw new AppError(400, 'Nombre inválido');
       const dup = this.repo
         .listAseguradoras(false)
         .find((a) => a.id !== id && a.nombre.toLowerCase() === nombre.toLowerCase());
       if (dup) throw new AppError(409, 'Ya existe una aseguradora con ese nombre');
-      input = { ...input, nombre };
+      next = { ...next, nombre };
     }
-    const updated = this.repo.updateAseguradora(id, input);
+    if (input.personaResponsable !== undefined && input.personaResponsable) {
+      next = {
+        ...next,
+        personaResponsable: titleCaseWords(input.personaResponsable),
+      };
+    }
+    const updated = this.repo.updateAseguradora(id, next);
     if (!updated) throw new AppError(404, 'Aseguradora no encontrada');
     return updated;
   }

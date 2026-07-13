@@ -1,4 +1,5 @@
 import type { Role } from './roles';
+import type { Permission } from './permissions';
 
 export interface User {
   id: string;
@@ -18,6 +19,9 @@ export interface PublicUser {
   role: Role;
   empresaId: string | null;
   empresaNombre: string | null;
+  permissions: Permission[];
+  /** Unix seconds — fin de sesión (misma exp del JWT). */
+  exp?: number;
 }
 
 export interface JwtPayload {
@@ -27,6 +31,7 @@ export interface JwtPayload {
   role: Role;
   empresaId: string | null;
   empresaNombre: string | null;
+  permissions: Permission[];
   iat?: number;
   exp?: number;
 }

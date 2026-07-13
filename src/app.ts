@@ -1,4 +1,5 @@
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
@@ -33,7 +34,8 @@ export function createApp() {
         const normalized = origin.replace(/\/$/, '');
         const allowed = env.corsOrigins.some((o) => o === normalized || o === '*');
         if (allowed) {
-          callback(null, true);
+          // Con credentials debe devolver el origin concreto, no `*`.
+          callback(null, normalized);
           return;
         }
         console.warn(`[cors] blocked origin: ${origin} (allowed: ${env.corsOrigins.join(', ')})`);
@@ -45,6 +47,7 @@ export function createApp() {
     }),
   );
 
+  app.use(cookieParser());
   app.use(express.json({ limit: '2.5mb' }));
 
   const loginLimiter = rateLimit({

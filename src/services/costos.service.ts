@@ -19,6 +19,7 @@ import type {
 } from '../types/plantilla-pdf';
 import { EMPTY_PLANTILLA_EXTRAS } from '../types/plantilla-pdf';
 import type { PublicUser } from '../types/user';
+import { titleCaseWords } from '../utils/text';
 import { requireTenantEmpresaId } from './tenant-scope';
 
 export class CostosService {
@@ -43,7 +44,7 @@ export class CostosService {
   }
 
   createCategoria(user: PublicUser, input: CrearCategoriaInput): CategoriaCosto {
-    const nombre = input.nombre.trim();
+    const nombre = titleCaseWords(input.nombre);
     if (!nombre) throw new AppError(400, 'El nombre de la categoría es obligatorio');
 
     const dup = costoRepository
@@ -70,7 +71,7 @@ export class CostosService {
     const cat = this.requireCategoriaOwned(user, id);
 
     if (input.nombre !== undefined) {
-      const nombre = input.nombre.trim();
+      const nombre = titleCaseWords(input.nombre);
       if (!nombre) throw new AppError(400, 'El nombre no puede quedar vacío');
       const dup = costoRepository
         .listCategorias(this.eid(user))
@@ -100,7 +101,7 @@ export class CostosService {
   createItem(user: PublicUser, input: CrearItemInput): ItemCosto {
     this.requireCategoriaOwned(user, input.categoriaId);
 
-    const nombre = input.nombre.trim();
+    const nombre = titleCaseWords(input.nombre);
     if (!nombre) throw new AppError(400, 'El nombre del ítem es obligatorio');
     this.assertMoney(input.costoInterno, 'costoInterno');
     this.assertMoney(input.precioSugerido, 'precioSugerido');
@@ -129,7 +130,7 @@ export class CostosService {
       item.categoriaId = input.categoriaId;
     }
     if (input.nombre !== undefined) {
-      const nombre = input.nombre.trim();
+      const nombre = titleCaseWords(input.nombre);
       if (!nombre) throw new AppError(400, 'El nombre no puede quedar vacío');
       item.nombre = nombre;
     }
