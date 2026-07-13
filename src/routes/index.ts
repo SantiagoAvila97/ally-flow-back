@@ -6,15 +6,20 @@ import balanceRoutes from './balance.routes';
 import casosRoutes from './casos.routes';
 import catalogosRoutes from './catalogos.routes';
 import costosRoutes from './costos.routes';
+import empresasRoutes from './empresas.routes';
 import geoRoutes from './geo.routes';
+import usuariosRoutes from './usuarios.routes';
+import { APP_VERSION } from '../version';
 
 const router = Router();
 
+/** También en router por compatibilidad; el de app.ts es el del healthcheck (sin rate-limit). */
 router.get('/health', (_req, res) => {
-  res.json({
+  res.status(200).json({
     ok: true,
     status: 'ok',
     service: 'ally-flow-api',
+    version: APP_VERSION,
     appEnv: env.appEnv,
     database: hasDatabase() ? 'postgres' : 'memory',
     time: new Date().toISOString(),
@@ -26,6 +31,8 @@ router.use('/balance', balanceRoutes);
 router.use('/casos', casosRoutes);
 router.use('/catalogos', catalogosRoutes);
 router.use('/costos', costosRoutes);
+router.use('/empresas', empresasRoutes);
 router.use('/geo', geoRoutes);
+router.use('/usuarios', usuariosRoutes);
 
 export default router;

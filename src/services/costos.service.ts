@@ -1,4 +1,5 @@
 import { AppError } from '../middlewares/error.middleware';
+import { findEmpresaById } from '../data/empresas.seed';
 import { costoRepository } from '../repositories/costo.repository';
 import { plantillaPdfRepository } from '../repositories/plantilla-pdf.repository';
 import { catalogosService } from './catalogos.service';
@@ -19,16 +20,22 @@ import type {
 } from '../types/plantilla-pdf';
 import { EMPTY_PLANTILLA_EXTRAS } from '../types/plantilla-pdf';
 import type { PublicUser } from '../types/user';
+import { titleCaseWords } from '../utils/text';
+import { requireTenantEmpresaId } from './tenant-scope';
 
 export class CostosService {
+  private eid(user: PublicUser): string {
+    return requireTenantEmpresaId(user);
+  }
+
   /**
    * Árbol completo: categorías con sus ítems (pantalla Costos).
    */
   listTree(user: PublicUser): CategoriaConItems[] {
-    const cats = costoRepository.listCategorias(user.empresaId);
+    const cats = costoRepository.listCategorias(this.eid(user));
     return cats.map((c) => ({
       ...c,
-      items: costoRepository.listItems(user.empresaId, c.id),
+      items: costoRepository.listItems(this.eid(user), c.id),
     }));
   }
 
@@ -38,20 +45,22 @@ export class CostosService {
   }
 
   createCategoria(user: PublicUser, input: CrearCategoriaInput): CategoriaCosto {
-    const nombre = input.nombre.trim();
+    const nombre = titleCaseWords(input.nombre);
     if (!nombre) throw new AppError(400, 'El nombre de la categoría es obligatorio');
+    const descripcion = (input.descripcion ?? '').trim();
+    if (!descripcion) throw new AppError(400, 'La descripción de la categoría es obligatoria');
 
     const dup = costoRepository
-      .listCategorias(user.empresaId)
+      .listCategorias(this.eid(user))
       .some((c) => c.nombre.toLowerCase() === nombre.toLowerCase());
     if (dup) throw new AppError(409, 'Ya existe una categoría con ese nombre');
 
     const now = new Date().toISOString();
     return costoRepository.createCategoria({
       id: costoRepository.nextId('cat'),
-      empresaId: user.empresaId,
+      empresaId: this.eid(user),
       nombre,
-      descripcion: (input.descripcion ?? '').trim(),
+      descripcion,
       createdAt: now,
       updatedAt: now,
     });
@@ -65,16 +74,18 @@ export class CostosService {
     const cat = this.requireCategoriaOwned(user, id);
 
     if (input.nombre !== undefined) {
-      const nombre = input.nombre.trim();
+      const nombre = titleCaseWords(input.nombre);
       if (!nombre) throw new AppError(400, 'El nombre no puede quedar vacío');
       const dup = costoRepository
-        .listCategorias(user.empresaId)
+        .listCategorias(this.eid(user))
         .some((c) => c.id !== id && c.nombre.toLowerCase() === nombre.toLowerCase());
       if (dup) throw new AppError(409, 'Ya existe una categoría con ese nombre');
       cat.nombre = nombre;
     }
     if (input.descripcion !== undefined) {
-      cat.descripcion = input.descripcion.trim();
+      const descripcion = input.descripcion.trim();
+      if (!descripcion) throw new AppError(400, 'La descripción no puede quedar vacía');
+      cat.descripcion = descripcion;
     }
 
     const updated = costoRepository.updateCategoria(id, {
@@ -95,21 +106,25 @@ export class CostosService {
   createItem(user: PublicUser, input: CrearItemInput): ItemCosto {
     this.requireCategoriaOwned(user, input.categoriaId);
 
-    const nombre = input.nombre.trim();
+    const nombre = titleCaseWords(input.nombre);
     if (!nombre) throw new AppError(400, 'El nombre del ítem es obligatorio');
+    const descripcion = (input.descripcion ?? '').trim();
+    if (!descripcion) throw new AppError(400, 'La descripción del ítem es obligatoria');
+    const unidad = (input.unidad ?? '').trim();
+    if (!unidad) throw new AppError(400, 'La unidad del ítem es obligatoria');
     this.assertMoney(input.costoInterno, 'costoInterno');
     this.assertMoney(input.precioSugerido, 'precioSugerido');
 
     const now = new Date().toISOString();
     return costoRepository.createItem({
       id: costoRepository.nextId('item'),
-      empresaId: user.empresaId,
+      empresaId: this.eid(user),
       categoriaId: input.categoriaId,
       nombre,
-      descripcion: (input.descripcion ?? '').trim(),
+      descripcion,
       costoInterno: input.costoInterno,
       precioSugerido: input.precioSugerido,
-      unidad: (input.unidad ?? 'und').trim() || 'und',
+      unidad,
       activo: input.activo ?? true,
       createdAt: now,
       updatedAt: now,
@@ -124,11 +139,15 @@ export class CostosService {
       item.categoriaId = input.categoriaId;
     }
     if (input.nombre !== undefined) {
-      const nombre = input.nombre.trim();
+      const nombre = titleCaseWords(input.nombre);
       if (!nombre) throw new AppError(400, 'El nombre no puede quedar vacío');
       item.nombre = nombre;
     }
-    if (input.descripcion !== undefined) item.descripcion = input.descripcion.trim();
+    if (input.descripcion !== undefined) {
+      const descripcion = input.descripcion.trim();
+      if (!descripcion) throw new AppError(400, 'La descripción no puede quedar vacía');
+      item.descripcion = descripcion;
+    }
     if (input.costoInterno !== undefined) {
       this.assertMoney(input.costoInterno, 'costoInterno');
       item.costoInterno = input.costoInterno;
@@ -137,7 +156,11 @@ export class CostosService {
       this.assertMoney(input.precioSugerido, 'precioSugerido');
       item.precioSugerido = input.precioSugerido;
     }
-    if (input.unidad !== undefined) item.unidad = input.unidad.trim() || 'und';
+    if (input.unidad !== undefined) {
+      const unidad = input.unidad.trim();
+      if (!unidad) throw new AppError(400, 'La unidad no puede quedar vacía');
+      item.unidad = unidad;
+    }
     if (input.activo !== undefined) item.activo = input.activo;
 
     const updated = costoRepository.updateItem(id, {
@@ -161,7 +184,7 @@ export class CostosService {
 
   private requireCategoriaOwned(user: PublicUser, id: string): CategoriaCosto {
     const cat = costoRepository.findCategoria(id);
-    if (!cat || cat.empresaId !== user.empresaId) {
+    if (!cat || cat.empresaId !== this.eid(user)) {
       throw new AppError(404, 'Categoría no encontrada');
     }
     return cat;
@@ -169,7 +192,7 @@ export class CostosService {
 
   private requireItemOwned(user: PublicUser, id: string): ItemCosto {
     const item = costoRepository.findItem(id);
-    if (!item || item.empresaId !== user.empresaId) {
+    if (!item || item.empresaId !== this.eid(user)) {
       throw new AppError(404, 'Ítem no encontrado');
     }
     return item;
@@ -182,10 +205,10 @@ export class CostosService {
   }
 
   private ensureGeneral(user: PublicUser): PlantillaPdfCobro {
-    const existing = plantillaPdfRepository.findDefault(user.empresaId);
+    const existing = plantillaPdfRepository.findDefault(this.eid(user));
     if (existing) return existing;
-    return plantillaPdfRepository.upsert(user.empresaId, null, {
-      razonSocial: user.empresaNombre,
+    return plantillaPdfRepository.upsert(this.eid(user), null, {
+      razonSocial: user.empresaNombre ?? 'Empresa',
       tipoPlantilla: 'tabla_operativa',
       textoHeader: 'Factura para cobro',
     });
@@ -199,7 +222,7 @@ export class CostosService {
     const general = this.ensureGeneral(user);
     if (!aseguradoraId) return general;
 
-    const override = plantillaPdfRepository.findByAseguradora(user.empresaId, aseguradoraId);
+    const override = plantillaPdfRepository.findByAseguradora(this.eid(user), aseguradoraId);
     return {
       ...general,
       id: override?.id ?? '',
@@ -211,7 +234,7 @@ export class CostosService {
 
   listPlantillasPdf(user: PublicUser): PlantillaPdfCobro[] {
     this.ensureGeneral(user);
-    return plantillaPdfRepository.listByEmpresa(user.empresaId);
+    return plantillaPdfRepository.listByEmpresa(this.eid(user));
   }
 
   updatePlantillaPdf(
@@ -229,15 +252,15 @@ export class CostosService {
       input.aseguradoraId === undefined ? null : input.aseguradoraId;
 
     if (aseguradoraId) {
-      const aseg = catalogosService.listAseguradoras(false).find((a) => a.id === aseguradoraId);
-      if (!aseg) throw new AppError(400, 'Aseguradora no válida');
+      const aseg = catalogosService.listAseguradoras(user, false).find((a) => a.id === aseguradoraId);
+      if (!aseg) throw new AppError(400, 'Cliente no válido');
 
       // Cabecera unificada: branding solo en general; aquí solo extras.
       const extras = {
         ...EMPTY_PLANTILLA_EXTRAS,
         ...(input.extras ?? {}),
       };
-      plantillaPdfRepository.upsert(user.empresaId, aseguradoraId, { extras });
+      plantillaPdfRepository.upsert(this.eid(user), aseguradoraId, { extras });
 
       // Si también mandan branding, actualizar la general (misma cabecera para todos).
       const hasBranding =
@@ -252,20 +275,20 @@ export class CostosService {
         input.tipoPlantilla !== undefined;
       if (hasBranding) {
         const { aseguradoraId: _a, extras: _e, ...branding } = input;
-        plantillaPdfRepository.upsert(user.empresaId, null, branding);
+        plantillaPdfRepository.upsert(this.eid(user), null, branding);
       }
 
       return this.getPlantillaPdf(user, aseguradoraId);
     }
 
     const { aseguradoraId: _a, extras: _e, ...branding } = input;
-    plantillaPdfRepository.upsert(user.empresaId, null, branding);
+    plantillaPdfRepository.upsert(this.eid(user), null, branding);
     return this.getPlantillaPdf(user, null);
   }
 
   deletePlantillaPdf(user: PublicUser, id: string): void {
     const row = plantillaPdfRepository.findById(id);
-    if (!row || row.empresaId !== user.empresaId) {
+    if (!row || row.empresaId !== this.eid(user)) {
       throw new AppError(404, 'Plantilla no encontrada');
     }
     if (row.aseguradoraId === null) {
@@ -276,10 +299,10 @@ export class CostosService {
     }
   }
 
-  /** Cabecera general + extras de la aseguradora del caso (si existen). */
+  /** Cabecera general + extras del cliente del caso (si existen). */
   resolvePlantillaForCaso(user: PublicUser, aseguradoraNombre: string): PlantillaPdfCobro {
     const aseg = catalogosService
-      .listAseguradoras(false)
+      .listAseguradoras(user, false)
       .find((a) => a.nombre.toLowerCase() === aseguradoraNombre.trim().toLowerCase());
     if (aseg) return this.getPlantillaPdf(user, aseg.id);
     return this.getPlantillaPdf(user, null);
@@ -321,13 +344,15 @@ export class CostosService {
       throw new AppError(400, 'Tipo de plantilla inválido');
     }
 
-    let aseguradoraNombre = 'Aseguradora de ejemplo';
+    let aseguradoraNombre = 'Cliente de ejemplo';
     if (asegId) {
-      const aseg = catalogosService.listAseguradoras(false).find((a) => a.id === asegId);
+      const aseg = catalogosService.listAseguradoras(user, false).find((a) => a.id === asegId);
       if (aseg) aseguradoraNombre = aseg.nombre;
     }
 
-    return buildDocumentoCobroPdf(buildCasoDemoPreview(user, aseguradoraNombre), plantilla);
+    return buildDocumentoCobroPdf(buildCasoDemoPreview(user, aseguradoraNombre), plantilla, {
+      logoDataUrl: findEmpresaById(requireTenantEmpresaId(user))?.logoDataUrl ?? null,
+    });
   }
 }
 
@@ -339,7 +364,7 @@ function buildCasoDemoPreview(user: PublicUser, aseguradoraNombre: string): Caso
     descripcion: 'Caso ficticio para previsualizar la factura de cobro.',
     cliente: aseguradoraNombre,
     estado: 'PendienteDocumentoCobro',
-    empresaId: user.empresaId,
+    empresaId: requireTenantEmpresaId(user),
     asesorId: user.id,
     tecnicoId: null,
     numeroAseguradora: 'PREV-001',

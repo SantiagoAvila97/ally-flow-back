@@ -1,30 +1,34 @@
 import { AppError } from '../middlewares/error.middleware';
 import { getCategoriasForEmpresa } from '../data/categorias.seed';
-import { findUserById, USERS_SEED } from '../data/users.seed';
+import { findUserById, listUsersByEmpresa, USERS_SEED } from '../data/users.seed';
 import { casoRepository, type ICasoRepository } from '../repositories/caso.repository';
+import { catalogoRepository } from '../repositories/catalogo.repository';
 import { catalogosService } from './catalogos.service';
 import type { Caso, CrearCasoInput, EstadoCaso, HistorialCambio, LineaCobro } from '../types/caso';
 import { ESTADOS_CASO, ESTADOS_OCULTOS_TECNICO } from '../types/caso';
 import type { ListCasosQuery, PaginatedResult } from '../types/pagination';
 import { paginate } from '../types/pagination';
 import type { PublicUser } from '../types/user';
+import { assertCasoAction } from '../types/caso-permissions';
+import { permissionsForRole } from '../types/permissions';
+import { requireTenantEmpresaId } from './tenant-scope';
+import { titleCaseWords } from '../utils/text';
 
-/** ~2MB de texto; cubre dataURL de foto/firma razonable. */
-const MAX_MEDIA_CHARS = 2_000_000;
+/** ~2.5MB de texto; foto/firma comprimidasy enviadas como dataURL. */
+const MAX_MEDIA_CHARS = 2_500_000;
 const DATA_IMAGE_RE = /^data:image\/(png|jpeg|jpg|webp);base64,/i;
 
 function assertMediaPayload(raw: string, field: string): string {
   const value = raw.trim();
   if (!value) throw new AppError(400, `${field} requerida`);
   if (value.length > MAX_MEDIA_CHARS) {
-    throw new AppError(400, `${field} demasiado grande (máx. ~2MB)`);
+    throw new AppError(400, `${field} demasiado grande (máx. ~2.5MB). Usa una foto más liviana`);
   }
   if (DATA_IMAGE_RE.test(value)) return value;
-  if (/^https?:\/\//i.test(value)) return value;
-  throw new AppError(
-    400,
-    `${field}: usa una imagen (PNG/JPEG/WebP) o una URL http(s)`,
-  );
+  if (/^https?:\/\//i.test(value)) {
+    throw new AppError(400, `${field}: no se permiten URLs. Sube la foto desde el dispositivo`);
+  }
+  throw new AppError(400, `${field}: solo se aceptan fotos PNG/JPEG/WebP`);
 }
 
 function historial(
@@ -46,7 +50,7 @@ export class CasosService {
 
   /** Visibilidad por rol (sin paginar). */
   private visibleForUser(user: PublicUser): Caso[] {
-    const deEmpresa = this.repo.findByEmpresa(user.empresaId);
+    const deEmpresa = this.repo.findByEmpresa(requireTenantEmpresaId(user));
 
     switch (user.role) {
       case 'ADMIN':
@@ -158,69 +162,84 @@ export class CasosService {
   }
 
   getCategorias(user: PublicUser): string[] {
-    return getCategoriasForEmpresa(user.empresaId);
+    return getCategoriasForEmpresa(requireTenantEmpresaId(user));
   }
 
   listTecnicos(user: PublicUser): PublicUser[] {
-    return USERS_SEED.filter(
-      (u) => u.empresaId === user.empresaId && u.role === 'TECNICO',
-    ).map((u) => ({
-      id: u.id,
-      email: u.email,
-      nombre: u.nombre,
-      role: u.role,
-      empresaId: u.empresaId,
-      empresaNombre: user.empresaNombre,
-    }));
+    const empresaId = requireTenantEmpresaId(user);
+    return listUsersByEmpresa(empresaId)
+      .filter((u) => u.role === 'TECNICO')
+      .map((u) => ({
+        id: u.id,
+        email: u.email,
+        nombre: u.nombre,
+        role: u.role,
+        empresaId: u.empresaId,
+        empresaNombre: user.empresaNombre,
+        permissions: permissionsForRole(u.role),
+        esOwner: Boolean(u.esOwner),
+      }));
   }
 
   create(input: CrearCasoInput, user: PublicUser): Caso {
-    if (user.role !== 'ASESOR' && user.role !== 'ADMIN') {
-      throw new AppError(403, 'Solo asesores o admin pueden crear casos');
-    }
+    assertCasoAction(user, null, 'crear');
 
-    const categorias = getCategoriasForEmpresa(user.empresaId);
+    const categorias = getCategoriasForEmpresa(requireTenantEmpresaId(user));
+    if (categorias.length === 0) {
+      throw new AppError(
+        400,
+        'Esta empresa aún no tiene categorías de servicio. El admin debe crearlas en Admin → Tarifas.',
+      );
+    }
     if (!categorias.includes(input.categoriaServicio)) {
       throw new AppError(400, `Categoría inválida. Use: ${categorias.join(', ')}`);
     }
 
-    if (!catalogosService.isAseguradoraValida(input.aseguradora)) {
-      throw new AppError(400, 'Aseguradora no válida. Elige una del catálogo.');
+    if (!catalogosService.isAseguradoraValida(user, input.aseguradora)) {
+      throw new AppError(400, 'Cliente no válido. Elige uno del catálogo.');
     }
 
     if (!catalogosService.isCiudadValida(input.ciudad)) {
       throw new AppError(400, 'Ciudad no válida. Elige una del catálogo.');
     }
 
+    const aseguradoraNombre =
+      catalogoRepository.findAseguradoraByNombre(
+        requireTenantEmpresaId(user),
+        input.aseguradora,
+      )?.nombre ?? input.aseguradora.trim();
+    const ciudadNombre =
+      catalogoRepository.findCiudadByNombre(input.ciudad)?.nombre ?? input.ciudad.trim();
+
     const now = new Date().toISOString();
     const id =
       typeof (this.repo as typeof casoRepository).nextId === 'function'
         ? (this.repo as typeof casoRepository).nextId(
-            user.empresaId.includes('norte') ? 'caso-norte' : 'caso-full',
+            requireTenantEmpresaId(user).includes('demo') ? 'caso-demo' : 'caso-full',
           )
         : `caso-${Date.now()}`;
 
     const asesorId =
       user.role === 'ASESOR'
         ? user.id
-        : (USERS_SEED.find((u) => u.empresaId === user.empresaId && u.role === 'ASESOR')?.id ??
+        : (USERS_SEED.find((u) => u.empresaId === requireTenantEmpresaId(user) && u.role === 'ASESOR')?.id ??
           user.id);
 
     const caso: Caso = {
       id,
-      titulo: input.titulo.trim(),
+      titulo: titleCaseWords(input.titulo),
       descripcion: (input.descripcion ?? input.observaciones ?? '').trim(),
-      cliente: input.aseguradora.trim(),
+      cliente: aseguradoraNombre,
       estado: 'PendienteAsignacion',
-      empresaId: user.empresaId,
+      empresaId: requireTenantEmpresaId(user),
       asesorId,
       tecnicoId: null,
       numeroAseguradora: input.numeroAseguradora.trim(),
-      aseguradora: input.aseguradora.trim(),
-      titularNombre: input.titularNombre.trim(),
+      aseguradora: aseguradoraNombre,
+      titularNombre: titleCaseWords(input.titularNombre),
       titularTelefono: input.titularTelefono.trim(),
-      direccion: input.direccion.trim(),
-      ciudad: input.ciudad.trim(),
+      direccion: titleCaseWords(input.direccion),
+      ciudad: ciudadNombre,
       lat: input.lat ?? null,
       lon: input.lon ?? null,
       direccionNormalizada: (input.direccionNormalizada ?? '').trim() || null,
@@ -246,25 +265,11 @@ export class CasosService {
   }
 
   asignarTecnico(id: string, tecnicoId: string, user: PublicUser): Caso {
-    if (user.role !== 'ADMIN' && user.role !== 'ASESOR') {
-      throw new AppError(403, 'No puedes asignar técnicos');
-    }
-
     const caso = this.getById(id, user);
-    const asignables: Caso['estado'][] = [
-      'PendienteAsignacion',
-      'EnGarantia',
-      'Asignado',
-    ];
-    if (!asignables.includes(caso.estado)) {
-      throw new AppError(
-        400,
-        'Solo se asigna o reasigna en Pendiente asignación, En garantía o Asignado',
-      );
-    }
+    assertCasoAction(user, caso.estado, 'asignar');
 
     const tecnico = findUserById(tecnicoId);
-    if (!tecnico || tecnico.role !== 'TECNICO' || tecnico.empresaId !== user.empresaId) {
+    if (!tecnico || tecnico.role !== 'TECNICO' || tecnico.empresaId !== requireTenantEmpresaId(user)) {
       throw new AppError(400, 'Técnico inválido para esta empresa');
     }
 
@@ -286,11 +291,9 @@ export class CasosService {
 
   iniciarGestion(id: string, user: PublicUser): Caso {
     const caso = this.getById(id, user);
-    if (user.role !== 'TECNICO' || caso.tecnicoId !== user.id) {
+    assertCasoAction(user, caso.estado, 'iniciar');
+    if (caso.tecnicoId !== user.id) {
       throw new AppError(403, 'Solo el técnico asignado puede iniciar');
-    }
-    if (caso.estado !== 'Asignado') {
-      throw new AppError(400, 'El caso debe estar Asignado para iniciar gestión');
     }
 
     const updated = this.repo.appendHistorial(
@@ -303,12 +306,9 @@ export class CasosService {
 
   addFoto(id: string, url: string, user: PublicUser): Caso {
     const caso = this.getById(id, user);
-
-    if (user.role !== 'TECNICO' || caso.tecnicoId !== user.id) {
+    assertCasoAction(user, caso.estado, 'fotos');
+    if (caso.tecnicoId !== user.id) {
       throw new AppError(403, 'Solo el técnico asignado puede subir fotos');
-    }
-    if (caso.estado !== 'EnGestion') {
-      throw new AppError(400, 'Solo se suben fotos en EnGestion');
     }
     if (!url.trim()) throw new AppError(400, 'URL de foto requerida');
     const media = assertMediaPayload(url, 'foto');
@@ -327,12 +327,9 @@ export class CasosService {
     user: PublicUser,
   ): Caso {
     const caso = this.getById(id, user);
-
-    if (user.role !== 'TECNICO' || caso.tecnicoId !== user.id) {
+    assertCasoAction(user, caso.estado, 'documentar');
+    if (caso.tecnicoId !== user.id) {
       throw new AppError(403, 'Solo el técnico asignado puede documentar');
-    }
-    if (caso.estado !== 'EnGestion') {
-      throw new AppError(400, 'Solo se documenta en EnGestion');
     }
     if (!input.nota.trim()) {
       throw new AppError(400, 'La nota de documentación es obligatoria');
@@ -362,12 +359,9 @@ export class CasosService {
     user: PublicUser,
   ): Caso {
     const caso = this.getById(id, user);
-
-    if (user.role !== 'TECNICO' || caso.tecnicoId !== user.id) {
+    assertCasoAction(user, caso.estado, 'completar');
+    if (caso.tecnicoId !== user.id) {
       throw new AppError(403, 'Solo el técnico asignado puede cerrar');
-    }
-    if (caso.estado !== 'EnGestion') {
-      throw new AppError(400, 'El caso debe estar EnGestion');
     }
     if (caso.fotos.length < 1) {
       throw new AppError(400, 'Debes adjuntar al menos una foto de evidencia');
@@ -422,11 +416,8 @@ export class CasosService {
   }
 
   setLineasCobro(id: string, lineas: LineaCobro[], user: PublicUser): Caso {
-    this.assertAsesorAdmin(user);
     const caso = this.getById(id, user);
-    if (caso.estado !== 'PendienteDocumentoCobro') {
-      throw new AppError(400, 'Solo se editan líneas en PendienteDocumentoCobro');
-    }
+    assertCasoAction(user, caso.estado, 'lineas_cobro');
     if (caso.esGarantia) {
       throw new AppError(400, 'Los casos de garantía no tienen documento de cobro');
     }
@@ -437,7 +428,7 @@ export class CasosService {
       if (l.precioUnitario < 0) throw new AppError(400, 'Precio inválido');
       return {
         itemCostoId: l.itemCostoId ?? null,
-        nombre: l.nombre.trim(),
+        nombre: titleCaseWords(l.nombre),
         unidad: (l.unidad || 'und').trim(),
         cantidad: Number(l.cantidad),
         precioUnitario: Number(l.precioUnitario),
@@ -458,11 +449,8 @@ export class CasosService {
   }
 
   marcarDocumentoGenerado(id: string, user: PublicUser): Caso {
-    this.assertAsesorAdmin(user);
     const caso = this.getById(id, user);
-    if (caso.estado !== 'PendienteDocumentoCobro') {
-      throw new AppError(400, 'El caso no está en PendienteDocumentoCobro');
-    }
+    assertCasoAction(user, caso.estado, 'lineas_cobro');
     const updated = this.repo.update(id, {
       documentoCobroGeneradoAt: new Date().toISOString(),
     });
@@ -471,11 +459,8 @@ export class CasosService {
   }
 
   enviarDocumento(id: string, user: PublicUser): Caso {
-    this.assertAsesorAdmin(user);
     const caso = this.getById(id, user);
-    if (caso.estado !== 'PendienteDocumentoCobro') {
-      throw new AppError(400, 'Solo se envía desde PendienteDocumentoCobro');
-    }
+    assertCasoAction(user, caso.estado, 'enviar_documento');
     if (!caso.lineasCobro?.length) {
       throw new AppError(400, 'Agrega al menos un ítem de cobro antes de enviar');
     }
@@ -493,11 +478,8 @@ export class CasosService {
   }
 
   confirmarAsegurado(id: string, user: PublicUser): Caso {
-    this.assertAsesorAdmin(user);
     const caso = this.getById(id, user);
-    if (caso.estado !== 'PendienteConfirmacionAsegurado') {
-      throw new AppError(400, 'Solo se confirma desde PendienteConfirmacionAsegurado');
-    }
+    assertCasoAction(user, caso.estado, 'confirmar_asegurado');
 
     const updated = this.repo.appendHistorial(
       id,
@@ -508,12 +490,8 @@ export class CasosService {
   }
 
   cobrar(id: string, user: PublicUser): Caso {
-    this.assertAsesorAdmin(user);
-
     const caso = this.getById(id, user);
-    if (caso.estado !== 'PendienteRecepcionPago') {
-      throw new AppError(400, 'Solo PendienteRecepcionPago puede marcarse cobrado');
-    }
+    assertCasoAction(user, caso.estado, 'cobrar');
     if (caso.esGarantia) {
       throw new AppError(400, 'Los casos de garantía no pasan por cobro');
     }
@@ -527,18 +505,11 @@ export class CasosService {
   }
 
   /**
-   * Reabre el caso por garantía (sin cobro).
-   * Siempre pasa por EnGarantia; el asesor/admin asigna (o reasigna) técnico → Asignado.
+   * Reabre el caso por garantía (sin cobro). Solo ADMIN.
    */
   abrirGarantia(id: string, user: PublicUser): Caso {
-    if (user.role !== 'ADMIN' && user.role !== 'ASESOR') {
-      throw new AppError(403, 'No puedes abrir garantía');
-    }
-
     const caso = this.getById(id, user);
-    if (caso.estado !== 'Cobrado' && caso.estado !== 'CerradoGarantia') {
-      throw new AppError(400, 'Solo se abre garantía desde Cobrado o CerradoGarantia');
-    }
+    assertCasoAction(user, caso.estado, 'garantia');
 
     const updated = this.repo.appendHistorial(
       id,
@@ -566,18 +537,19 @@ export class CasosService {
     return updated;
   }
 
-  private assertAsesorAdmin(user: PublicUser): void {
-    if (user.role !== 'ADMIN' && user.role !== 'ASESOR') {
-      throw new AppError(403, 'Solo asesor o admin');
-    }
-  }
-
   private canView(caso: Caso, user: PublicUser): boolean {
-    if (caso.empresaId !== user.empresaId) return false;
+    if (caso.empresaId !== requireTenantEmpresaId(user)) return false;
     if (user.role === 'ADMIN' || user.role === 'ASESOR') return true;
     if (user.role === 'TECNICO') {
-      // Puede ver sus casos aunque ya pasaron a cobranza (handoff / historial).
-      return caso.tecnicoId === user.id;
+      if (caso.tecnicoId !== user.id) return false;
+      // Handoff: puede ver el detalle hasta PendingDocumentoCobro; no estados comerciales posteriores.
+      if (
+        ESTADOS_OCULTOS_TECNICO.includes(caso.estado) &&
+        caso.estado !== 'PendienteDocumentoCobro'
+      ) {
+        return false;
+      }
+      return true;
     }
     return false;
   }

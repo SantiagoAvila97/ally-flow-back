@@ -37,6 +37,10 @@ export class InMemoryPlantillaPdfRepository {
       });
   }
 
+  listAll(): PlantillaPdfCobro[] {
+    return [...this.rows];
+  }
+
   findById(id: string): PlantillaPdfCobro | undefined {
     return this.rows.find((r) => r.id === id);
   }
@@ -115,6 +119,15 @@ export class InMemoryPlantillaPdfRepository {
     this.rows = this.rows.filter((r) => r.id !== id);
     persistDeletePlantilla(id);
     return true;
+  }
+
+  deleteByEmpresa(empresaId: string): number {
+    const removed = this.rows.filter((r) => r.empresaId === empresaId);
+    this.rows = this.rows.filter((r) => r.empresaId !== empresaId);
+    for (const r of removed) {
+      persistDeletePlantilla(r.id);
+    }
+    return removed.length;
   }
 }
 

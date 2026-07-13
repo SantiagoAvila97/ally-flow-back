@@ -39,7 +39,7 @@ export interface CategoriaConItems extends CategoriaCosto {
 
 export interface CrearCategoriaInput {
   nombre: string;
-  descripcion?: string;
+  descripcion: string;
 }
 
 export interface ActualizarCategoriaInput {
@@ -50,10 +50,10 @@ export interface ActualizarCategoriaInput {
 export interface CrearItemInput {
   categoriaId: string;
   nombre: string;
-  descripcion?: string;
+  descripcion: string;
   costoInterno: number;
   precioSugerido: number;
-  unidad?: string;
+  unidad: string;
   activo?: boolean;
 }
 

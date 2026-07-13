@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import { costosController } from '../controllers/costos.controller';
 import { authenticate } from '../middlewares/auth.middleware';
-import { requireRoles } from '../middlewares/role.middleware';
+import { requireRoles, requireTenant } from '../middlewares/role.middleware';
 
 const router = Router();
 
-router.use(authenticate);
+router.use(authenticate, requireTenant);
 
 /** Catálogo de tarifas: lectura para armar documento de cobro (ASESOR + ADMIN). */
 router.get(

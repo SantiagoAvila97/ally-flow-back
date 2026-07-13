@@ -88,6 +88,12 @@ export class InMemoryCasoRepository implements ICasoRepository {
       estado: cambio.estado,
     });
   }
+
+  deleteByEmpresa(empresaId: string): number {
+    const before = this.casos.length;
+    this.casos = this.casos.filter((c) => c.empresaId !== empresaId);
+    return before - this.casos.length;
+  }
 }
 
 export const casoRepository = new InMemoryCasoRepository();

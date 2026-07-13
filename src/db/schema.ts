@@ -2,7 +2,9 @@ export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS empresas (
   id TEXT PRIMARY KEY,
   nombre TEXT NOT NULL,
-  slug TEXT NOT NULL UNIQUE
+  slug TEXT NOT NULL UNIQUE,
+  nit TEXT NOT NULL DEFAULT '',
+  logo_data TEXT
 );
 
 CREATE TABLE IF NOT EXISTS users (
@@ -10,13 +12,16 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT NOT NULL UNIQUE,
   nombre TEXT NOT NULL,
   password_hash TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('ADMIN', 'ASESOR', 'TECNICO')),
-  empresa_id TEXT NOT NULL REFERENCES empresas (id)
+  role TEXT NOT NULL CHECK (role IN ('ADMIN', 'ASESOR', 'TECNICO', 'SUPER_ADMIN')),
+  empresa_id TEXT REFERENCES empresas (id),
+  activo BOOLEAN NOT NULL DEFAULT TRUE,
+  es_owner BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 CREATE TABLE IF NOT EXISTS aseguradoras (
   id TEXT PRIMARY KEY,
-  nombre TEXT NOT NULL UNIQUE,
+  empresa_id TEXT NOT NULL REFERENCES empresas (id),
+  nombre TEXT NOT NULL,
   nit TEXT,
   persona_responsable TEXT,
   contacto_cobros TEXT,
@@ -24,6 +29,8 @@ CREATE TABLE IF NOT EXISTS aseguradoras (
   activa BOOLEAN NOT NULL DEFAULT TRUE
 );
 
+-- Índice único (empresa_id, nombre) se crea en migrate patches
+-- después de asegurar la columna en DBs legadas.
 CREATE TABLE IF NOT EXISTS ciudades (
   id TEXT PRIMARY KEY,
   nombre TEXT NOT NULL,

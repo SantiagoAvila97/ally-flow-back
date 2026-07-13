@@ -47,14 +47,14 @@ export interface PlantillaPdfCobro {
 
 export interface ActualizarPlantillaPdfInput {
   aseguradoraId?: string | null;
-  razonSocial?: string;
-  nit?: string;
-  ciudad?: string;
-  telefono?: string;
-  email?: string;
-  colorAcento?: string;
-  textoHeader?: string;
-  textoFooter?: string;
+  razonSocial: string;
+  nit: string;
+  ciudad: string;
+  telefono: string;
+  email: string;
+  colorAcento: string;
+  textoHeader: string;
+  textoFooter: string;
   tipoPlantilla?: TipoPlantillaPdf;
   extras?: Partial<PlantillaPdfExtras>;
 }

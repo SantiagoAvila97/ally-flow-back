@@ -35,12 +35,12 @@ export async function loadAllFromDb(): Promise<{
     plantillasRes,
     casosRes,
   ] = await Promise.all([
-    pool.query('SELECT id, nombre, slug FROM empresas ORDER BY nombre'),
+    pool.query('SELECT id, nombre, slug, nit, logo_data FROM empresas ORDER BY nombre'),
     pool.query(
-      'SELECT id, email, nombre, password_hash, role, empresa_id FROM users ORDER BY email',
+      'SELECT id, email, nombre, password_hash, role, empresa_id, activo, es_owner FROM users ORDER BY email',
     ),
     pool.query(
-      `SELECT id, nombre, nit, persona_responsable, contacto_cobros, whatsapp, activa
+      `SELECT id, empresa_id, nombre, nit, persona_responsable, contacto_cobros, whatsapp, activa
        FROM aseguradoras ORDER BY nombre`,
     ),
     pool.query('SELECT id, nombre, area, activa FROM ciudades ORDER BY nombre'),
@@ -65,6 +65,8 @@ export async function loadAllFromDb(): Promise<{
     id: r.id,
     nombre: r.nombre,
     slug: r.slug,
+    nit: r.nit ?? '',
+    logoDataUrl: r.logo_data ?? null,
   }));
 
   const users: User[] = usersRes.rows.map((r) => ({
@@ -73,11 +75,14 @@ export async function loadAllFromDb(): Promise<{
     nombre: r.nombre,
     passwordHash: r.password_hash,
     role: r.role,
-    empresaId: r.empresa_id,
+    empresaId: r.empresa_id ?? null,
+    activo: r.activo !== false,
+    esOwner: Boolean(r.es_owner),
   }));
 
   const aseguradoras: Aseguradora[] = asegRes.rows.map((r) => ({
     id: r.id,
+    empresaId: r.empresa_id,
     nombre: r.nombre,
     nit: r.nit,
     personaResponsable: r.persona_responsable,

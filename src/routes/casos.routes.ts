@@ -1,23 +1,28 @@
 import { Router } from 'express';
 import { casosController } from '../controllers/casos.controller';
 import { authenticate } from '../middlewares/auth.middleware';
-import { requireRoles } from '../middlewares/role.middleware';
+import { requireRoles, requireTenant } from '../middlewares/role.middleware';
+import { CASO_ACTION_ROLES } from '../types/caso-permissions';
 
 const router = Router();
 
-router.use(authenticate);
+router.use(authenticate, requireTenant);
 
 router.get('/', (req, res, next) => casosController.list(req, res, next));
-router.get('/meta/categorias', (req, res, next) =>
-  casosController.categorias(req, res, next),
+router.get(
+  '/meta/categorias',
+  requireRoles('ADMIN', 'ASESOR', 'TECNICO'),
+  (req, res, next) => casosController.categorias(req, res, next),
 );
-router.get('/meta/tecnicos', (req, res, next) =>
-  casosController.tecnicos(req, res, next),
+router.get(
+  '/meta/tecnicos',
+  requireRoles(...CASO_ACTION_ROLES.asignar),
+  (req, res, next) => casosController.tecnicos(req, res, next),
 );
 
 router.post(
   '/',
-  requireRoles('ASESOR', 'ADMIN'),
+  requireRoles(...CASO_ACTION_ROLES.crear),
   (req, res, next) => casosController.create(req, res, next),
 );
 
@@ -25,49 +30,43 @@ router.get('/:id', (req, res, next) => casosController.getById(req, res, next));
 
 router.patch(
   '/:id/asignar',
-  requireRoles('ADMIN', 'ASESOR'),
+  requireRoles(...CASO_ACTION_ROLES.asignar),
   (req, res, next) => casosController.asignar(req, res, next),
 );
 
 router.patch(
   '/:id/iniciar',
-  requireRoles('TECNICO'),
+  requireRoles(...CASO_ACTION_ROLES.iniciar),
   (req, res, next) => casosController.iniciar(req, res, next),
 );
 
 router.post(
   '/:id/fotos',
-  requireRoles('TECNICO'),
+  requireRoles(...CASO_ACTION_ROLES.fotos),
   (req, res, next) => casosController.addFoto(req, res, next),
 );
 
 router.post(
   '/:id/documentar',
-  requireRoles('TECNICO'),
+  requireRoles(...CASO_ACTION_ROLES.documentar),
   (req, res, next) => casosController.documentar(req, res, next),
 );
 
 router.post(
   '/:id/completar',
-  requireRoles('TECNICO'),
+  requireRoles(...CASO_ACTION_ROLES.completar),
   (req, res, next) => casosController.completar(req, res, next),
 );
 
 router.patch(
-  '/:id/cobrar',
-  requireRoles('ADMIN', 'ASESOR'),
-  (req, res, next) => casosController.cobrar(req, res, next),
-);
-
-router.patch(
   '/:id/lineas-cobro',
-  requireRoles('ADMIN', 'ASESOR'),
+  requireRoles(...CASO_ACTION_ROLES.lineas_cobro),
   (req, res, next) => casosController.setLineasCobro(req, res, next),
 );
 
 router.get(
   '/:id/documento-cobro.pdf',
-  requireRoles('ADMIN', 'ASESOR'),
+  requireRoles(...CASO_ACTION_ROLES.lineas_cobro),
   (req, res, next) => {
     void casosController.documentoCobroPdf(req, res, next);
   },
@@ -75,19 +74,25 @@ router.get(
 
 router.patch(
   '/:id/enviar-documento',
-  requireRoles('ADMIN', 'ASESOR'),
+  requireRoles(...CASO_ACTION_ROLES.enviar_documento),
   (req, res, next) => casosController.enviarDocumento(req, res, next),
 );
 
 router.patch(
   '/:id/confirmar-asegurado',
-  requireRoles('ADMIN', 'ASESOR'),
+  requireRoles(...CASO_ACTION_ROLES.confirmar_asegurado),
   (req, res, next) => casosController.confirmarAsegurado(req, res, next),
+);
+
+router.patch(
+  '/:id/cobrar',
+  requireRoles(...CASO_ACTION_ROLES.cobrar),
+  (req, res, next) => casosController.cobrar(req, res, next),
 );
 
 router.post(
   '/:id/garantia',
-  requireRoles('ADMIN', 'ASESOR'),
+  requireRoles(...CASO_ACTION_ROLES.garantia),
   (req, res, next) => casosController.garantia(req, res, next),
 );
 

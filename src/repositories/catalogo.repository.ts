@@ -7,8 +7,10 @@ import {
   persistDeleteCiudad,
 } from '../db/persist';
 import type { Aseguradora, CiudadCatalogo } from '../types/catalogo';
+import { titleCaseWords } from '../utils/text';
 
 export interface CreateAseguradoraInput {
+  empresaId: string;
   nombre: string;
   nit?: string | null;
   personaResponsable?: string | null;
@@ -39,9 +41,9 @@ export interface UpdateCiudadInput {
 }
 
 export interface ICatalogoRepository {
-  listAseguradoras(soloActivas?: boolean): Aseguradora[];
+  listAseguradoras(empresaId: string, soloActivas?: boolean): Aseguradora[];
   findAseguradoraById(id: string): Aseguradora | undefined;
-  findAseguradoraByNombre(nombre: string): Aseguradora | undefined;
+  findAseguradoraByNombre(empresaId: string, nombre: string): Aseguradora | undefined;
   createAseguradora(input: CreateAseguradoraInput): Aseguradora;
   updateAseguradora(id: string, input: UpdateAseguradoraInput): Aseguradora | undefined;
   deleteAseguradora(id: string): boolean;
@@ -76,24 +78,31 @@ export class InMemoryCatalogoRepository implements ICatalogoRepository {
     this.ciudades = structuredClone(ciudades);
   }
 
-  listAseguradoras(soloActivas = true): Aseguradora[] {
+  listAseguradoras(empresaId: string, soloActivas = true): Aseguradora[] {
     return this.aseguradoras
-      .filter((a) => (soloActivas ? a.activa : true))
+      .filter((a) => a.empresaId === empresaId && (soloActivas ? a.activa : true))
       .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  }
+
+  listAllAseguradoras(): Aseguradora[] {
+    return [...this.aseguradoras];
   }
 
   findAseguradoraById(id: string): Aseguradora | undefined {
     return this.aseguradoras.find((a) => a.id === id);
   }
 
-  findAseguradoraByNombre(nombre: string): Aseguradora | undefined {
+  findAseguradoraByNombre(empresaId: string, nombre: string): Aseguradora | undefined {
     const n = nombre.trim().toLowerCase();
-    return this.aseguradoras.find((a) => a.activa && a.nombre.toLowerCase() === n);
+    return this.aseguradoras.find(
+      (a) => a.empresaId === empresaId && a.activa && a.nombre.toLowerCase() === n,
+    );
   }
 
   createAseguradora(input: CreateAseguradoraInput): Aseguradora {
     const row: Aseguradora = {
       id: slugId('aseg', input.nombre),
+      empresaId: input.empresaId,
       nombre: input.nombre.trim(),
       nit: input.nit?.trim() || null,
       personaResponsable: input.personaResponsable?.trim() || null,
@@ -147,9 +156,10 @@ export class InMemoryCatalogoRepository implements ICatalogoRepository {
   }
 
   createCiudad(input: CreateCiudadInput): CiudadCatalogo {
+    const nombre = titleCaseWords(input.nombre);
     const row: CiudadCatalogo = {
-      id: slugId('ciudad', input.nombre),
-      nombre: input.nombre.trim(),
+      id: slugId('ciudad', nombre),
+      nombre,
       area: (input.area ?? 'bogota-area').trim() || 'bogota-area',
       activa: input.activa ?? true,
     };
@@ -161,7 +171,7 @@ export class InMemoryCatalogoRepository implements ICatalogoRepository {
   updateCiudad(id: string, input: UpdateCiudadInput): CiudadCatalogo | undefined {
     const row = this.findCiudadById(id);
     if (!row) return undefined;
-    if (input.nombre !== undefined) row.nombre = input.nombre.trim();
+    if (input.nombre !== undefined) row.nombre = titleCaseWords(input.nombre);
     if (input.area !== undefined) row.area = input.area.trim() || row.area;
     if (input.activa !== undefined) row.activa = input.activa;
     persistCiudad(row);
@@ -174,6 +184,16 @@ export class InMemoryCatalogoRepository implements ICatalogoRepository {
     this.ciudades.splice(idx, 1);
     persistDeleteCiudad(id);
     return true;
+  }
+
+  deleteAseguradorasByEmpresa(empresaId: string): number {
+    const before = this.aseguradoras.length;
+    const removed = this.aseguradoras.filter((a) => a.empresaId === empresaId);
+    this.aseguradoras = this.aseguradoras.filter((a) => a.empresaId !== empresaId);
+    for (const a of removed) {
+      persistDeleteAseguradora(a.id);
+    }
+    return before - this.aseguradoras.length;
   }
 }
 

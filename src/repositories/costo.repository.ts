@@ -43,6 +43,14 @@ export class InMemoryCostoRepository implements ICostoRepository {
       .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
   }
 
+  listAllCategorias(): CategoriaCosto[] {
+    return [...this.categorias];
+  }
+
+  listAllItems(): ItemCosto[] {
+    return [...this.items];
+  }
+
   findCategoria(id: string): CategoriaCosto | undefined {
     return this.categorias.find((c) => c.id === id);
   }
@@ -121,6 +129,11 @@ export class InMemoryCostoRepository implements ICostoRepository {
   nextId(prefix: string): string {
     this.seq += 1;
     return `${prefix}-${this.seq}-${Date.now().toString(36)}`;
+  }
+
+  deleteByEmpresa(empresaId: string): void {
+    this.items = this.items.filter((i) => i.empresaId !== empresaId);
+    this.categorias = this.categorias.filter((c) => c.empresaId !== empresaId);
   }
 }
 

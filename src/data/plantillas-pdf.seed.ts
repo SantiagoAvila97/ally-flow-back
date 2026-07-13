@@ -21,7 +21,7 @@ export const PLANTILLAS_PDF_SEED: PlantillaPdfCobro[] = [
     updatedAt: now,
   },
   {
-    id: 'pdf-norte-default',
+    id: 'pdf-demo-default',
     empresaId: EMPRESA_DEMO,
     aseguradoraId: null,
     razonSocial: 'DEMO Ltda.',
@@ -32,7 +32,7 @@ export const PLANTILLAS_PDF_SEED: PlantillaPdfCobro[] = [
     colorAcento: '#1e3a5f',
     textoHeader: 'Factura para cobro',
     textoFooter: 'DEMO — documento de reclamacion para aseguradora. Generado por Ally Flow.',
-    tipoPlantilla: 'carta_siniestro',
+    tipoPlantilla: 'tabla_operativa',
     extras: { ...EMPTY_PLANTILLA_EXTRAS },
     updatedAt: now,
   },
