@@ -1,22 +1,12 @@
 import type { Empresa } from '../types/empresa';
-import { loadLogoDataUrl } from '../utils/load-logo-asset';
 
 export const EMPRESA_FULL = 'emp-full-soluciones';
 /** Tenant demo. Id estable para seeds/costos. */
 export const EMPRESA_DEMO = 'emp-demo';
 
-function tryLogo(filename: string): string | null {
-  try {
-    return loadLogoDataUrl(filename);
-  } catch {
-    console.warn(`[seed] logo asset missing: ${filename}`);
-    return null;
-  }
-}
-
 /**
  * Clientes (tenants) del MVP.
- * Full Soluciones usa el logo oficial; DEMO usa icono Ally cuadrado.
+ * Sin archivos de logo: el OWNER los sube en Perfil y viven en DB (logo_data).
  */
 export const EMPRESAS_SEED: Empresa[] = [
   {
@@ -24,16 +14,13 @@ export const EMPRESAS_SEED: Empresa[] = [
     nombre: 'Full Soluciones',
     slug: 'full-soluciones',
     nit: '900000001',
-    // Seed sin logo forzado: el OWNER lo sube (cuadro + en header/perfil).
-    // Si hay asset, se usa; si no, queda null.
-    logoDataUrl: tryLogo('full-soluciones.png'),
+    logoDataUrl: null,
   },
   {
     id: EMPRESA_DEMO,
     nombre: 'DEMO',
     slug: 'demo',
     nit: '900000002',
-    /** DEMO puede existir sin logo → UI con cuadro punteado +. */
     logoDataUrl: null,
   },
 ];
