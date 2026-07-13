@@ -1,3 +1,4 @@
+import { env } from '../config/env';
 import { EMPRESAS_SEED } from '../data/empresas.seed';
 import { USERS_SEED } from '../data/users.seed';
 import { ASEGURADORAS_SEED } from '../data/aseguradoras.seed';
@@ -15,13 +16,24 @@ export async function isDatabaseEmpty(): Promise<boolean> {
   return Number(rows[0]?.c ?? 0) === 0;
 }
 
-/** Carga seeds del MVP la primera vez que la DB está vacía. */
+/**
+ * Seed demo (empresas Full + DEMO, usuarios, tarifas; casos solo en DEMO).
+ * - QA / local: sí, si la DB está vacía.
+ * - PROD: no, salvo SEED_DEMO=true.
+ */
 export async function seedIfEmpty(): Promise<void> {
+  const forceDemo = process.env.SEED_DEMO === 'true' || process.env.SEED_DEMO === '1';
+  if (env.appEnv === 'prod' && !forceDemo) {
+    console.log('[db] APP_ENV=prod — skip demo seed (crea empresa/admin en Neon SQL Editor)');
+    return;
+  }
+
   if (!(await isDatabaseEmpty())) {
     console.log('[db] already seeded — skip');
     return;
   }
 
+  console.log('[db] empty database — loading demo seed…');
   const pool = getPool();
   const client = await pool.connect();
   try {
@@ -112,7 +124,6 @@ export async function seedIfEmpty(): Promise<void> {
     client.release();
   }
 
-  // Plantillas y casos (pueden ser pesados): fuera de la tx larga
   for (const p of PLANTILLAS_PDF_SEED) {
     await upsertPlantilla(p);
   }

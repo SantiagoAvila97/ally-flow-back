@@ -1,4 +1,4 @@
-import { EMPRESA_FULL, EMPRESA_NORTE } from './empresas.seed';
+import { EMPRESA_FULL, EMPRESA_DEMO } from './empresas.seed';
 import { EMPTY_PLANTILLA_EXTRAS, type PlantillaPdfCobro } from '../types/plantilla-pdf';
 
 const now = '2026-07-01T10:00:00.000Z';
@@ -22,17 +22,16 @@ export const PLANTILLAS_PDF_SEED: PlantillaPdfCobro[] = [
   },
   {
     id: 'pdf-norte-default',
-    empresaId: EMPRESA_NORTE,
+    empresaId: EMPRESA_DEMO,
     aseguradoraId: null,
-    razonSocial: 'Norte Seguros Ltda.',
+    razonSocial: 'DEMO Ltda.',
     nit: '800.987.654-3',
     ciudad: 'Medellin',
     telefono: '+57 604 444 2200',
-    email: 'siniestros@norteseguros.com',
+    email: 'cobros@demo.local',
     colorAcento: '#1e3a5f',
     textoHeader: 'Factura para cobro',
-    textoFooter:
-      'Norte Seguros — documento de reclamacion para aseguradora. Generado por Ally Flow.',
+    textoFooter: 'DEMO — documento de reclamacion para aseguradora. Generado por Ally Flow.',
     tipoPlantilla: 'carta_siniestro',
     extras: { ...EMPTY_PLANTILLA_EXTRAS },
     updatedAt: now,

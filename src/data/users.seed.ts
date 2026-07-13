@@ -1,20 +1,20 @@
 import bcrypt from 'bcryptjs';
 import type { User } from '../types/user';
-import { EMPRESA_FULL, EMPRESA_NORTE } from './empresas.seed';
+import { EMPRESA_FULL, EMPRESA_DEMO } from './empresas.seed';
 
 /**
  * Usuarios demo — 2 empresas × 3 roles (ADMIN, ASESOR, TECNICO).
  * Cada usuario solo ve datos de su empresaId.
  *
- * Full Soluciones:
+ * Full Soluciones (QA):
  *   admin@fullsoluciones.com   / admin123
  *   asesor@fullsoluciones.com  / asesor123
  *   tecnico@fullsoluciones.com / tecnico123
  *
- * Norte Seguros:
- *   admin@norteseguros.com   / admin123
- *   asesor@norteseguros.com  / asesor123
- *   tecnico@norteseguros.com / tecnico123
+ * DEMO:
+ *   admin@demo.local   / admin123
+ *   asesor@demo.local  / asesor123
+ *   tecnico@demo.local / tecnico123
  */
 export const USERS_SEED: User[] = [
   {
@@ -43,27 +43,27 @@ export const USERS_SEED: User[] = [
   },
   {
     id: 'usr-norte-admin',
-    email: 'admin@norteseguros.com',
-    nombre: 'Nora Admin Norte',
+    email: 'admin@demo.local',
+    nombre: 'Nora Admin Demo',
     passwordHash: bcrypt.hashSync('admin123', 10),
     role: 'ADMIN',
-    empresaId: EMPRESA_NORTE,
+    empresaId: EMPRESA_DEMO,
   },
   {
     id: 'usr-norte-asesor',
-    email: 'asesor@norteseguros.com',
-    nombre: 'Álvaro Asesor Norte',
+    email: 'asesor@demo.local',
+    nombre: 'Álvaro Asesor Demo',
     passwordHash: bcrypt.hashSync('asesor123', 10),
     role: 'ASESOR',
-    empresaId: EMPRESA_NORTE,
+    empresaId: EMPRESA_DEMO,
   },
   {
     id: 'usr-norte-tecnico',
-    email: 'tecnico@norteseguros.com',
-    nombre: 'Tomás Técnico Norte',
+    email: 'tecnico@demo.local',
+    nombre: 'Tomás Técnico Demo',
     passwordHash: bcrypt.hashSync('tecnico123', 10),
     role: 'TECNICO',
-    empresaId: EMPRESA_NORTE,
+    empresaId: EMPRESA_DEMO,
   },
 ];
 

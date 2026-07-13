@@ -31,11 +31,22 @@ function resolveJwtSecret(): string {
   return value || weak;
 }
 
+function resolveCorsOrigins(): string[] {
+  const raw = process.env.CORS_ORIGIN ?? 'http://localhost:4200';
+  return raw
+    .split(',')
+    .map((s) => s.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+}
+
 export const env = {
   port: Number(process.env.PORT ?? 3000),
   jwtSecret: resolveJwtSecret(),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '8h',
-  corsOrigin: required('CORS_ORIGIN', 'http://localhost:4200'),
+  /** Orígenes permitidos (CORS_ORIGIN separado por comas). */
+  corsOrigins: resolveCorsOrigins(),
+  /** Compat: primer origen. */
+  corsOrigin: resolveCorsOrigins()[0] ?? 'http://localhost:4200',
   nodeEnv,
   isProd,
   /** dev | qa | prod — etiqueta de entorno (logs / demos). */

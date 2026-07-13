@@ -1,4 +1,4 @@
-import { EMPRESA_FULL, EMPRESA_NORTE } from './empresas.seed';
+import { EMPRESA_FULL, EMPRESA_DEMO } from './empresas.seed';
 import type { CategoriaCosto, ItemCosto } from '../types/costo';
 
 const now = '2026-07-01T10:00:00.000Z';
@@ -288,11 +288,11 @@ function buildForEmpresa(empresaId: string, suffix: string): {
 }
 
 const full = buildForEmpresa(EMPRESA_FULL, 'full');
-const norte = buildForEmpresa(EMPRESA_NORTE, 'norte');
+const demo = buildForEmpresa(EMPRESA_DEMO, 'norte');
 
 export const CATEGORIAS_COSTO_SEED: CategoriaCosto[] = [
   ...full.categorias,
-  ...norte.categorias,
+  ...demo.categorias,
 ];
 
-export const ITEMS_COSTO_SEED: ItemCosto[] = [...full.items, ...norte.items];
+export const ITEMS_COSTO_SEED: ItemCosto[] = [...full.items, ...demo.items];
