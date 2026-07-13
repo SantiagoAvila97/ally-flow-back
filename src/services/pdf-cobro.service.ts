@@ -1,6 +1,9 @@
 import PDFDocument from 'pdfkit';
 import type { Caso } from '../types/caso';
-import type { PlantillaPdfCobro } from '../types/plantilla-pdf';
+import {
+  hasPlantillaExtras,
+  type PlantillaPdfCobro,
+} from '../types/plantilla-pdf';
 
 function money(n: number): string {
   return new Intl.NumberFormat('es-CO', {
@@ -12,6 +15,7 @@ function money(n: number): string {
 
 /**
  * Genera el PDF de cobro según plantilla de la empresa.
+ * Cabecera unificada; extras opcionales por aseguradora.
  */
 export function buildDocumentoCobroPdf(
   caso: Caso,
@@ -32,6 +36,26 @@ export function buildDocumentoCobroPdf(
 
     doc.end();
   });
+}
+
+function renderExtrasBlock(
+  doc: PDFKit.PDFDocument,
+  p: PlantillaPdfCobro,
+): void {
+  if (!hasPlantillaExtras(p.extras)) return;
+  const e = p.extras;
+  doc.moveDown(0.8);
+  doc
+    .fontSize(9)
+    .font('Helvetica-Bold')
+    .fillColor('#334155')
+    .text('Datos adicionales para la aseguradora', { underline: true });
+  doc.moveDown(0.3).font('Helvetica').fillColor('#475569');
+  if (e.destinatario.trim()) doc.text(`Destinatario: ${e.destinatario}`);
+  if (e.codigoProveedor.trim()) doc.text(`Código proveedor: ${e.codigoProveedor}`);
+  if (e.notaAdicional.trim()) {
+    doc.moveDown(0.2).text(e.notaAdicional, { align: 'justify' });
+  }
 }
 
 function renderTablaOperativa(
@@ -78,6 +102,8 @@ function renderTablaOperativa(
     .text(`Dirección: ${caso.direccion}, ${caso.ciudad}`)
     .text(`Categoría: ${caso.categoriaServicio}`)
     .text(`Fecha: ${new Date().toLocaleDateString('es-CO')}`);
+
+  renderExtrasBlock(doc, p);
 
   doc.moveDown(1);
   const tableTop = doc.y;
@@ -164,6 +190,8 @@ function renderCartaSiniestro(
   doc.text(`Categoría de servicio: ${caso.categoriaServicio}`);
   doc.text(`Referencia interna: ${caso.id}`);
   doc.text(`Fecha de emisión: ${new Date().toLocaleDateString('es-CO')}`);
+
+  renderExtrasBlock(doc, p);
 
   doc.moveDown(1.2).font('Helvetica-Bold').text('Detalle de honorarios');
   doc.moveDown(0.4).font('Helvetica');

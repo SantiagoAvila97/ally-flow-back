@@ -1,12 +1,31 @@
 import type { Caso, EstadoCaso, HistorialCambio, LineaCobro } from '../types/caso';
 import { EMPRESA_FULL, EMPRESA_NORTE } from './empresas.seed';
 
-const now = new Date().toISOString();
-const dayAgo = new Date(Date.now() - 86_400_000).toISOString();
-const twoDaysAgo = new Date(Date.now() - 172_800_000).toISOString();
-const threeDaysAgo = new Date(Date.now() - 259_200_000).toISOString();
-const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
-const twoWeeksAgo = new Date(Date.now() - 14 * 86_400_000).toISOString();
+/** Fechas relativas al arranque (mocks variados para ordenar en UI). */
+function ago(days: number, hours = 0, minutes = 0): string {
+  return new Date(
+    Date.now() - days * 86_400_000 - hours * 3_600_000 - minutes * 60_000,
+  ).toISOString();
+}
+
+const now = ago(0);
+const dayAgo = ago(1, 2);
+const twoDaysAgo = ago(2, 5);
+const threeDaysAgo = ago(3, 1);
+
+/**
+ * Distribuye createdAt / updatedAt en ~6 semanas con hora distinta por índice.
+ * Así la bandeja no muestra todo con la misma fecha.
+ */
+function fechasParaIndice(index: number): { createdAt: string; updatedAt: string } {
+  const daysBack = (index * 11 + (index % 7) * 3) % 42; // 0–41 días
+  const hours = (index * 5 + 3) % 20; // 0–19 h
+  const minutes = (index * 13) % 55;
+  const updatedAt = ago(daysBack, hours, minutes);
+  const createdLagDays = 1 + (index % 6);
+  const createdAt = ago(daysBack + createdLagDays, (hours + 2) % 20, minutes);
+  return { createdAt, updatedAt };
+}
 
 interface EmpresaSeedCtx {
   empresaId: string;
@@ -159,6 +178,9 @@ function buildCaso(ctx: EmpresaSeedCtx, def: CasoDemoDef, index: number): Caso {
     def.estado === 'Cobrado';
 
   const lineas = comercial ? (def.lineas ?? PACK.medio) : [];
+  const { createdAt, updatedAt: autoUpdated } = fechasParaIndice(index);
+  const updatedAt = def.updatedAt ?? autoUpdated;
+  const updatedMs = Date.parse(updatedAt);
 
   return {
     id,
@@ -187,7 +209,7 @@ function buildCaso(ctx: EmpresaSeedCtx, def: CasoDemoDef, index: number): Caso {
       ? 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
       : null,
     firmaTecnicoUrl: null,
-    gestionadoAt: def.conFirma ? dayAgo : null,
+    gestionadoAt: def.conFirma ? new Date(updatedMs - 3_600_000).toISOString() : null,
     esGarantia,
     casoOrigenId: esGarantia ? `${ctx.prefix}-origen` : null,
     montoEstimado: comercial ? sumLineas(lineas) : null,
@@ -196,11 +218,11 @@ function buildCaso(ctx: EmpresaSeedCtx, def: CasoDemoDef, index: number): Caso {
       def.estado === 'PendienteConfirmacionAsegurado' ||
       def.estado === 'PendienteRecepcionPago' ||
       def.estado === 'Cobrado'
-        ? dayAgo
+        ? new Date(updatedMs - 86_400_000).toISOString()
         : null,
     historialCambios: buildTimeline(ctx, def.estado),
-    createdAt: threeDaysAgo,
-    updatedAt: def.updatedAt ?? now,
+    createdAt,
+    updatedAt,
   };
 }
 
@@ -582,7 +604,6 @@ const DEFS_FULL: CasoDemoDef[] = [
     conFotos: true,
     conFirma: true,
     lineas: PACK.chico,
-    updatedAt: dayAgo,
   },
   {
     estado: 'Cobrado',
@@ -599,7 +620,6 @@ const DEFS_FULL: CasoDemoDef[] = [
     conFotos: true,
     conFirma: true,
     lineas: PACK.grande,
-    updatedAt: twoDaysAgo,
   },
   {
     estado: 'Cobrado',
@@ -616,7 +636,6 @@ const DEFS_FULL: CasoDemoDef[] = [
     conFotos: true,
     conFirma: true,
     lineas: PACK.alto,
-    updatedAt: threeDaysAgo,
   },
   {
     estado: 'Cobrado',
@@ -633,7 +652,6 @@ const DEFS_FULL: CasoDemoDef[] = [
     conFotos: true,
     conFirma: true,
     lineas: PACK.mega,
-    updatedAt: weekAgo,
   },
   {
     estado: 'Cobrado',
@@ -650,7 +668,6 @@ const DEFS_FULL: CasoDemoDef[] = [
     conFotos: true,
     conFirma: true,
     lineas: PACK.medio,
-    updatedAt: weekAgo,
   },
   {
     estado: 'Cobrado',
@@ -667,7 +684,6 @@ const DEFS_FULL: CasoDemoDef[] = [
     conFotos: true,
     conFirma: true,
     lineas: PACK.office,
-    updatedAt: twoWeeksAgo,
   },
   {
     estado: 'Cobrado',
@@ -684,7 +700,6 @@ const DEFS_FULL: CasoDemoDef[] = [
     conFotos: true,
     conFirma: true,
     lineas: PACK.vip,
-    updatedAt: twoWeeksAgo,
   },
 
   // —— Garantía ——
@@ -1128,7 +1143,6 @@ const DEFS_NORTE: CasoDemoDef[] = [
     conFotos: true,
     conFirma: true,
     lineas: PACK.medio,
-    updatedAt: dayAgo,
   },
   {
     estado: 'Cobrado',
@@ -1145,7 +1159,6 @@ const DEFS_NORTE: CasoDemoDef[] = [
     conFotos: true,
     conFirma: true,
     lineas: PACK.grande,
-    updatedAt: twoDaysAgo,
   },
   {
     estado: 'Cobrado',
@@ -1162,7 +1175,6 @@ const DEFS_NORTE: CasoDemoDef[] = [
     conFotos: true,
     conFirma: true,
     lineas: PACK.mega,
-    updatedAt: threeDaysAgo,
   },
   {
     estado: 'Cobrado',
@@ -1179,7 +1191,6 @@ const DEFS_NORTE: CasoDemoDef[] = [
     conFotos: true,
     conFirma: true,
     lineas: PACK.alto,
-    updatedAt: weekAgo,
   },
   {
     estado: 'Cobrado',
@@ -1196,7 +1207,6 @@ const DEFS_NORTE: CasoDemoDef[] = [
     conFotos: true,
     conFirma: true,
     lineas: PACK.chico,
-    updatedAt: weekAgo,
   },
   {
     estado: 'Cobrado',
@@ -1213,7 +1223,6 @@ const DEFS_NORTE: CasoDemoDef[] = [
     conFotos: true,
     conFirma: true,
     lineas: PACK.vip,
-    updatedAt: twoWeeksAgo,
   },
   {
     estado: 'Cobrado',
@@ -1230,7 +1239,6 @@ const DEFS_NORTE: CasoDemoDef[] = [
     conFotos: true,
     conFirma: true,
     lineas: PACK.office,
-    updatedAt: twoWeeksAgo,
   },
 
   // Garantía
@@ -1320,9 +1328,30 @@ const CTX_NORTE: EmpresaSeedCtx = {
 
 /**
  * Persistencia MVP: se clona en RAM al arrancar (`InMemoryCasoRepository`).
- * Por empresa ~35 casos con montos variados (275k → ~5.5M) y densidad por etapa.
+ * ~80 casos/empresa para ejercitar paginación (pageSize máx. 50).
  */
+function expandDefs(defs: CasoDemoDef[], target: number, tag: string): CasoDemoDef[] {
+  if (defs.length >= target) return defs.slice(0, target);
+  const extra: CasoDemoDef[] = [];
+  let i = 0;
+  while (defs.length + extra.length < target) {
+    const base = defs[i % defs.length]!;
+    const n = defs.length + extra.length + 1;
+    extra.push({
+      ...base,
+      titulo: `${base.titulo} · lote ${n}`,
+      numeroAseguradora: `${tag}-${String(n).padStart(3, '0')}`,
+      titularNombre: `${base.titularNombre} (${n})`,
+    });
+    i += 1;
+  }
+  return [...defs, ...extra];
+}
+
+const DEFS_FULL_80 = expandDefs(DEFS_FULL, 80, 'FULL');
+const DEFS_NORTE_80 = expandDefs(DEFS_NORTE, 80, 'NORTE');
+
 export const CASOS_SEED: Caso[] = [
-  ...DEFS_FULL.map((d, i) => buildCaso(CTX_FULL, d, i + 1)),
-  ...DEFS_NORTE.map((d, i) => buildCaso(CTX_NORTE, d, i + 1)),
+  ...DEFS_FULL_80.map((d, i) => buildCaso(CTX_FULL, d, i + 1)),
+  ...DEFS_NORTE_80.map((d, i) => buildCaso(CTX_NORTE, d, i + 1)),
 ];

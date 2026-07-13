@@ -2,8 +2,11 @@ import { AppError } from '../middlewares/error.middleware';
 import { getCategoriasForEmpresa } from '../data/categorias.seed';
 import { findUserById, USERS_SEED } from '../data/users.seed';
 import { casoRepository, type ICasoRepository } from '../repositories/caso.repository';
-import type { Caso, CrearCasoInput, HistorialCambio, LineaCobro } from '../types/caso';
-import { ESTADOS_OCULTOS_TECNICO } from '../types/caso';
+import { catalogosService } from './catalogos.service';
+import type { Caso, CrearCasoInput, EstadoCaso, HistorialCambio, LineaCobro } from '../types/caso';
+import { ESTADOS_CASO, ESTADOS_OCULTOS_TECNICO } from '../types/caso';
+import type { ListCasosQuery, PaginatedResult } from '../types/pagination';
+import { paginate } from '../types/pagination';
 import type { PublicUser } from '../types/user';
 
 /** ~2MB de texto; cubre dataURL de foto/firma razonable. */
@@ -41,16 +44,15 @@ function historial(
 export class CasosService {
   constructor(private readonly repo: ICasoRepository = casoRepository) {}
 
-  listForUser(user: PublicUser): Caso[] {
+  /** Visibilidad por rol (sin paginar). */
+  private visibleForUser(user: PublicUser): Caso[] {
     const deEmpresa = this.repo.findByEmpresa(user.empresaId);
 
     switch (user.role) {
       case 'ADMIN':
       case 'ASESOR':
-        // Ambos ven la bandeja completa de la empresa (colaboración).
         return deEmpresa;
       case 'TECNICO':
-        // Ciclo comercial: no satura bandeja del técnico; detalle puede verse tras handoff.
         return deEmpresa.filter(
           (c) =>
             c.tecnicoId === user.id &&
@@ -59,6 +61,91 @@ export class CasosService {
       default:
         return [];
     }
+  }
+
+  /** @deprecated preferir listPaginated — mantiene compat si algo pide todo. */
+  listForUser(user: PublicUser): Caso[] {
+    return this.visibleForUser(user);
+  }
+
+  listPaginated(user: PublicUser, query: ListCasosQuery): PaginatedResult<Caso> {
+    let items = this.visibleForUser(user);
+
+    if (query.vista === 'comercial') {
+      const comercial: EstadoCaso[] = [
+        'PendienteDocumentoCobro',
+        'PendienteConfirmacionAsegurado',
+        'PendienteRecepcionPago',
+      ];
+      items = items.filter((c) => comercial.includes(c.estado));
+    } else if (query.vista === 'nos-deben') {
+      const nosDeben: EstadoCaso[] = [
+        'PendienteConfirmacionAsegurado',
+        'PendienteRecepcionPago',
+      ];
+      items = items.filter((c) => nosDeben.includes(c.estado));
+    }
+
+    if (query.estado && (ESTADOS_CASO as readonly string[]).includes(query.estado)) {
+      items = items.filter((c) => c.estado === query.estado);
+    }
+    if (query.categoria) {
+      items = items.filter((c) => c.categoriaServicio === query.categoria);
+    }
+    if (query.ciudad) {
+      items = items.filter((c) => c.ciudad === query.ciudad);
+    }
+    if (query.aseguradora) {
+      items = items.filter((c) => c.aseguradora === query.aseguradora);
+    }
+
+    const q = query.q?.trim().toLowerCase();
+    if (q) {
+      items = items.filter((c) => {
+        const haystack = [
+          c.titulo,
+          c.numeroAseguradora,
+          c.titularNombre,
+          c.aseguradora,
+          c.descripcion,
+          c.ciudad,
+          c.categoriaServicio,
+        ]
+          .join(' ')
+          .toLowerCase();
+        return haystack.includes(q);
+      });
+    }
+
+    const sort = query.sort ?? 'updatedAt';
+    const dir = query.sortDir === 'asc' ? 1 : -1;
+    items = [...items].sort((a, b) => {
+      let cmp = 0;
+      switch (sort) {
+        case 'createdAt':
+          cmp = Date.parse(a.createdAt) - Date.parse(b.createdAt);
+          break;
+        case 'titulo':
+          cmp = a.titulo.localeCompare(b.titulo, 'es');
+          break;
+        case 'aseguradora':
+          cmp = a.aseguradora.localeCompare(b.aseguradora, 'es');
+          break;
+        case 'estado':
+          cmp = a.estado.localeCompare(b.estado, 'es');
+          break;
+        case 'tecnico':
+          cmp = (a.tecnicoId ?? '').localeCompare(b.tecnicoId ?? '', 'es');
+          break;
+        case 'updatedAt':
+        default:
+          cmp = Date.parse(a.updatedAt) - Date.parse(b.updatedAt);
+          break;
+      }
+      return cmp * dir;
+    });
+
+    return paginate(items, query.page, query.pageSize);
   }
 
   getById(id: string, user: PublicUser): Caso {
@@ -95,6 +182,14 @@ export class CasosService {
     const categorias = getCategoriasForEmpresa(user.empresaId);
     if (!categorias.includes(input.categoriaServicio)) {
       throw new AppError(400, `Categoría inválida. Use: ${categorias.join(', ')}`);
+    }
+
+    if (!catalogosService.isAseguradoraValida(input.aseguradora)) {
+      throw new AppError(400, 'Aseguradora no válida. Elige una del catálogo.');
+    }
+
+    if (!catalogosService.isCiudadValida(input.ciudad)) {
+      throw new AppError(400, 'Ciudad no válida. Elige una del catálogo.');
     }
 
     const now = new Date().toISOString();

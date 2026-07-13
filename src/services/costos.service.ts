@@ -1,6 +1,8 @@
 import { AppError } from '../middlewares/error.middleware';
 import { costoRepository } from '../repositories/costo.repository';
 import { plantillaPdfRepository } from '../repositories/plantilla-pdf.repository';
+import { catalogosService } from './catalogos.service';
+import { buildDocumentoCobroPdf } from './pdf-cobro.service';
 import type {
   ActualizarCategoriaInput,
   ActualizarItemInput,
@@ -10,10 +12,12 @@ import type {
   CrearItemInput,
   ItemCosto,
 } from '../types/costo';
+import type { Caso } from '../types/caso';
 import type {
   ActualizarPlantillaPdfInput,
   PlantillaPdfCobro,
 } from '../types/plantilla-pdf';
+import { EMPTY_PLANTILLA_EXTRAS } from '../types/plantilla-pdf';
 import type { PublicUser } from '../types/user';
 
 export class CostosService {
@@ -177,13 +181,37 @@ export class CostosService {
     }
   }
 
-  getPlantillaPdf(user: PublicUser): PlantillaPdfCobro {
-    const existing = plantillaPdfRepository.findByEmpresa(user.empresaId);
+  private ensureGeneral(user: PublicUser): PlantillaPdfCobro {
+    const existing = plantillaPdfRepository.findDefault(user.empresaId);
     if (existing) return existing;
-    return plantillaPdfRepository.upsert(user.empresaId, {
+    return plantillaPdfRepository.upsert(user.empresaId, null, {
       razonSocial: user.empresaNombre,
       tipoPlantilla: 'tabla_operativa',
+      textoHeader: 'Factura para cobro',
     });
+  }
+
+  /**
+   * Cabecera siempre de la general. Si hay aseguradoraId, mezcla extras del override
+   * (o extras vacíos si aún no existe).
+   */
+  getPlantillaPdf(user: PublicUser, aseguradoraId?: string | null): PlantillaPdfCobro {
+    const general = this.ensureGeneral(user);
+    if (!aseguradoraId) return general;
+
+    const override = plantillaPdfRepository.findByAseguradora(user.empresaId, aseguradoraId);
+    return {
+      ...general,
+      id: override?.id ?? '',
+      aseguradoraId,
+      extras: override?.extras ?? { ...EMPTY_PLANTILLA_EXTRAS },
+      updatedAt: override?.updatedAt ?? general.updatedAt,
+    };
+  }
+
+  listPlantillasPdf(user: PublicUser): PlantillaPdfCobro[] {
+    this.ensureGeneral(user);
+    return plantillaPdfRepository.listByEmpresa(user.empresaId);
   }
 
   updatePlantillaPdf(
@@ -196,8 +224,163 @@ export class CostosService {
     if (input.colorAcento && !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(input.colorAcento)) {
       throw new AppError(400, 'colorAcento debe ser hex (#RGB o #RRGGBB)');
     }
-    return plantillaPdfRepository.upsert(user.empresaId, input);
+
+    const aseguradoraId =
+      input.aseguradoraId === undefined ? null : input.aseguradoraId;
+
+    if (aseguradoraId) {
+      const aseg = catalogosService.listAseguradoras(false).find((a) => a.id === aseguradoraId);
+      if (!aseg) throw new AppError(400, 'Aseguradora no válida');
+
+      // Cabecera unificada: branding solo en general; aquí solo extras.
+      const extras = {
+        ...EMPTY_PLANTILLA_EXTRAS,
+        ...(input.extras ?? {}),
+      };
+      plantillaPdfRepository.upsert(user.empresaId, aseguradoraId, { extras });
+
+      // Si también mandan branding, actualizar la general (misma cabecera para todos).
+      const hasBranding =
+        input.razonSocial !== undefined ||
+        input.nit !== undefined ||
+        input.ciudad !== undefined ||
+        input.telefono !== undefined ||
+        input.email !== undefined ||
+        input.colorAcento !== undefined ||
+        input.textoHeader !== undefined ||
+        input.textoFooter !== undefined ||
+        input.tipoPlantilla !== undefined;
+      if (hasBranding) {
+        const { aseguradoraId: _a, extras: _e, ...branding } = input;
+        plantillaPdfRepository.upsert(user.empresaId, null, branding);
+      }
+
+      return this.getPlantillaPdf(user, aseguradoraId);
+    }
+
+    const { aseguradoraId: _a, extras: _e, ...branding } = input;
+    plantillaPdfRepository.upsert(user.empresaId, null, branding);
+    return this.getPlantillaPdf(user, null);
   }
+
+  deletePlantillaPdf(user: PublicUser, id: string): void {
+    const row = plantillaPdfRepository.findById(id);
+    if (!row || row.empresaId !== user.empresaId) {
+      throw new AppError(404, 'Plantilla no encontrada');
+    }
+    if (row.aseguradoraId === null) {
+      throw new AppError(400, 'No se puede eliminar la plantilla general');
+    }
+    if (!plantillaPdfRepository.deleteOverride(id)) {
+      throw new AppError(404, 'Plantilla no encontrada');
+    }
+  }
+
+  /** Cabecera general + extras de la aseguradora del caso (si existen). */
+  resolvePlantillaForCaso(user: PublicUser, aseguradoraNombre: string): PlantillaPdfCobro {
+    const aseg = catalogosService
+      .listAseguradoras(false)
+      .find((a) => a.nombre.toLowerCase() === aseguradoraNombre.trim().toLowerCase());
+    if (aseg) return this.getPlantillaPdf(user, aseg.id);
+    return this.getPlantillaPdf(user, null);
+  }
+
+  /**
+   * PDF de prueba: usa el borrador del form (sin guardar) + caso demo.
+   */
+  async buildPreviewDocumentoCobroPdf(
+    user: PublicUser,
+    draft: ActualizarPlantillaPdfInput,
+  ): Promise<Buffer> {
+    const asegId = draft.aseguradoraId ?? null;
+    const base = this.getPlantillaPdf(user, asegId);
+    const plantilla: PlantillaPdfCobro = {
+      ...base,
+      razonSocial: draft.razonSocial ?? base.razonSocial,
+      nit: draft.nit ?? base.nit,
+      ciudad: draft.ciudad ?? base.ciudad,
+      telefono: draft.telefono ?? base.telefono,
+      email: draft.email ?? base.email,
+      colorAcento: draft.colorAcento ?? base.colorAcento,
+      textoHeader: draft.textoHeader ?? base.textoHeader,
+      textoFooter: draft.textoFooter ?? base.textoFooter,
+      tipoPlantilla: draft.tipoPlantilla ?? base.tipoPlantilla,
+      extras: draft.extras
+        ? { ...EMPTY_PLANTILLA_EXTRAS, ...base.extras, ...draft.extras }
+        : base.extras,
+      aseguradoraId: asegId,
+    };
+
+    if (plantilla.colorAcento && !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(plantilla.colorAcento)) {
+      throw new AppError(400, 'colorAcento debe ser hex (#RGB o #RRGGBB)');
+    }
+    if (
+      plantilla.tipoPlantilla &&
+      !['tabla_operativa', 'carta_siniestro'].includes(plantilla.tipoPlantilla)
+    ) {
+      throw new AppError(400, 'Tipo de plantilla inválido');
+    }
+
+    let aseguradoraNombre = 'Aseguradora de ejemplo';
+    if (asegId) {
+      const aseg = catalogosService.listAseguradoras(false).find((a) => a.id === asegId);
+      if (aseg) aseguradoraNombre = aseg.nombre;
+    }
+
+    return buildDocumentoCobroPdf(buildCasoDemoPreview(user, aseguradoraNombre), plantilla);
+  }
+}
+
+function buildCasoDemoPreview(user: PublicUser, aseguradoraNombre: string): Caso {
+  const now = new Date().toISOString();
+  return {
+    id: 'preview-demo',
+    titulo: 'Inspección demo — vista previa',
+    descripcion: 'Caso ficticio para previsualizar la factura de cobro.',
+    cliente: aseguradoraNombre,
+    estado: 'PendienteDocumentoCobro',
+    empresaId: user.empresaId,
+    asesorId: user.id,
+    tecnicoId: null,
+    numeroAseguradora: 'PREV-001',
+    aseguradora: aseguradoraNombre,
+    titularNombre: 'Cliente de ejemplo',
+    titularTelefono: '+57 300 000 0000',
+    direccion: 'Calle 100 #19-50',
+    ciudad: 'Bogotá',
+    lat: null,
+    lon: null,
+    direccionNormalizada: null,
+    categoriaServicio: 'Plomería',
+    observaciones: '',
+    fotos: [],
+    firmaAtendidoUrl: null,
+    firmaTecnicoUrl: null,
+    gestionadoAt: null,
+    esGarantia: false,
+    casoOrigenId: null,
+    montoEstimado: 300000,
+    lineasCobro: [
+      {
+        itemCostoId: null,
+        nombre: 'Visita técnica',
+        unidad: 'und',
+        cantidad: 1,
+        precioUnitario: 120000,
+      },
+      {
+        itemCostoId: null,
+        nombre: 'Destape de desagüe',
+        unidad: 'und',
+        cantidad: 1,
+        precioUnitario: 180000,
+      },
+    ],
+    documentoCobroGeneradoAt: null,
+    historialCambios: [],
+    createdAt: now,
+    updatedAt: now,
+  };
 }
 
 export const costosService = new CostosService();

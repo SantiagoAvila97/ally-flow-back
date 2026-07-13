@@ -1,9 +1,9 @@
 import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
-import { CIUDADES_BOGOTA_AREA } from '../data/ciudades.seed';
-import { plantillaPdfRepository } from '../repositories/plantilla-pdf.repository';
+import { costosService } from '../services/costos.service';
 import { casosService } from '../services/casos.service';
 import { buildDocumentoCobroPdf } from '../services/pdf-cobro.service';
+import { parsePagination } from '../types/pagination';
 
 const crearSchema = z.object({
   titulo: z.string().min(3),
@@ -13,7 +13,7 @@ const crearSchema = z.object({
   titularNombre: z.string().min(1),
   titularTelefono: z.string().min(5),
   direccion: z.string().min(5),
-  ciudad: z.enum(CIUDADES_BOGOTA_AREA as unknown as [string, ...string[]]),
+  ciudad: z.string().min(1),
   categoriaServicio: z.string().min(1),
   observaciones: z.string().optional(),
   lat: z.number().nullable().optional(),
@@ -67,7 +67,25 @@ const lineasCobroSchema = z.object({
 export class CasosController {
   list(req: Request, res: Response, next: NextFunction): void {
     try {
-      res.json({ data: casosService.listForUser(req.user!) });
+      const { page, pageSize } = parsePagination(req.query as Record<string, unknown>);
+      const sortDir =
+        req.query.sortDir === 'asc' || req.query.sortDir === 'desc'
+          ? req.query.sortDir
+          : 'desc';
+      const result = casosService.listPaginated(req.user!, {
+        page,
+        pageSize,
+        q: typeof req.query.q === 'string' ? req.query.q : undefined,
+        estado: typeof req.query.estado === 'string' ? req.query.estado : undefined,
+        categoria: typeof req.query.categoria === 'string' ? req.query.categoria : undefined,
+        ciudad: typeof req.query.ciudad === 'string' ? req.query.ciudad : undefined,
+        aseguradora:
+          typeof req.query.aseguradora === 'string' ? req.query.aseguradora : undefined,
+        vista: typeof req.query.vista === 'string' ? req.query.vista : undefined,
+        sort: typeof req.query.sort === 'string' ? req.query.sort : 'updatedAt',
+        sortDir,
+      });
+      res.json(result);
     } catch (err) {
       next(err);
     }
@@ -254,13 +272,10 @@ export class CasosController {
         return;
       }
 
-      let plantilla = plantillaPdfRepository.findByEmpresa(req.user!.empresaId);
-      if (!plantilla) {
-        plantilla = plantillaPdfRepository.upsert(req.user!.empresaId, {
-          razonSocial: req.user!.empresaNombre,
-          tipoPlantilla: 'tabla_operativa',
-        });
-      }
+      const plantilla = costosService.resolvePlantillaForCaso(
+        req.user!,
+        caso.aseguradora,
+      );
 
       const pdf = await buildDocumentoCobroPdf(caso, plantilla);
       if (caso.estado === 'PendienteDocumentoCobro') {

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import authRoutes from './auth.routes';
 import balanceRoutes from './balance.routes';
 import casosRoutes from './casos.routes';
+import catalogosRoutes from './catalogos.routes';
 import costosRoutes from './costos.routes';
 import geoRoutes from './geo.routes';
 
@@ -10,6 +11,7 @@ const router = Router();
 router.use('/auth', authRoutes);
 router.use('/balance', balanceRoutes);
 router.use('/casos', casosRoutes);
+router.use('/catalogos', catalogosRoutes);
 router.use('/costos', costosRoutes);
 router.use('/geo', geoRoutes);
 

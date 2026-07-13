@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { env } from '../config/env';
-import { isCiudadBogotaArea } from '../data/ciudades.seed';
+import { catalogosService } from '../services/catalogos.service';
 
 export interface GeoResult {
   displayName: string;
@@ -79,8 +79,8 @@ export async function searchAddress(req: Request, res: Response, next: NextFunct
       return;
     }
 
-    if (!ciudad || !isCiudadBogotaArea(ciudad)) {
-      res.status(400).json({ message: 'Selecciona una ciudad válida del área de Bogotá' });
+    if (!ciudad || !catalogosService.isCiudadValida(ciudad)) {
+      res.status(400).json({ message: 'Selecciona una ciudad válida del catálogo' });
       return;
     }
 

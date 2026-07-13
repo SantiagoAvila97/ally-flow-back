@@ -33,6 +33,7 @@ const itemPatchSchema = z.object({
 });
 
 const plantillaPatchSchema = z.object({
+  aseguradoraId: z.string().min(1).nullable().optional(),
   razonSocial: z.string().min(1).optional(),
   nit: z.string().optional(),
   ciudad: z.string().optional(),
@@ -42,6 +43,13 @@ const plantillaPatchSchema = z.object({
   textoHeader: z.string().optional(),
   textoFooter: z.string().optional(),
   tipoPlantilla: z.enum(['tabla_operativa', 'carta_siniestro']).optional(),
+  extras: z
+    .object({
+      destinatario: z.string().optional(),
+      codigoProveedor: z.string().optional(),
+      notaAdicional: z.string().optional(),
+    })
+    .optional(),
 });
 
 export class CostosController {
@@ -127,9 +135,20 @@ export class CostosController {
     }
   }
 
+  listPlantillas(req: Request, res: Response, next: NextFunction): void {
+    try {
+      res.json({ data: costosService.listPlantillasPdf(req.user!) });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   getPlantilla(req: Request, res: Response, next: NextFunction): void {
     try {
-      res.json({ data: costosService.getPlantillaPdf(req.user!) });
+      const raw = req.query.aseguradoraId;
+      const aseguradoraId =
+        typeof raw === 'string' && raw.length > 0 ? raw : null;
+      res.json({ data: costosService.getPlantillaPdf(req.user!, aseguradoraId) });
     } catch (err) {
       next(err);
     }
@@ -143,6 +162,34 @@ export class CostosController {
         return;
       }
       res.json({ data: costosService.updatePlantillaPdf(req.user!, parsed.data) });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  deletePlantilla(req: Request, res: Response, next: NextFunction): void {
+    try {
+      costosService.deletePlantillaPdf(req.user!, req.params['id']!);
+      res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async previewPlantillaPdf(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const parsed = plantillaPatchSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        res.status(400).json({ message: 'Datos inválidos', errors: parsed.error.flatten() });
+        return;
+      }
+      const pdf = await costosService.buildPreviewDocumentoCobroPdf(req.user!, parsed.data);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        'attachment; filename="factura-cobro-prueba.pdf"',
+      );
+      res.send(pdf);
     } catch (err) {
       next(err);
     }

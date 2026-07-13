@@ -16,14 +16,29 @@ router.get(
 
 /** Mutaciones y plantilla PDF: solo ADMIN. */
 router.get(
+  '/plantillas-pdf',
+  requireRoles('ADMIN'),
+  (req, res, next) => costosController.listPlantillas(req, res, next),
+);
+router.get(
   '/plantilla-pdf',
   requireRoles('ADMIN'),
   (req, res, next) => costosController.getPlantilla(req, res, next),
+);
+router.post(
+  '/plantilla-pdf/preview.pdf',
+  requireRoles('ADMIN'),
+  (req, res, next) => costosController.previewPlantillaPdf(req, res, next),
 );
 router.patch(
   '/plantilla-pdf',
   requireRoles('ADMIN'),
   (req, res, next) => costosController.updatePlantilla(req, res, next),
+);
+router.delete(
+  '/plantilla-pdf/:id',
+  requireRoles('ADMIN'),
+  (req, res, next) => costosController.deletePlantilla(req, res, next),
 );
 
 router.post(
