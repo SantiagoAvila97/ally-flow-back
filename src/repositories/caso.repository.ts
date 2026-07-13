@@ -1,4 +1,5 @@
 import { CASOS_SEED } from '../data/casos.seed';
+import { persistCaso } from '../db/persist';
 import type { Caso, HistorialCambio } from '../types/caso';
 
 export interface ICasoRepository {
@@ -11,11 +12,17 @@ export interface ICasoRepository {
   update(id: string, patch: Partial<Caso>): Caso | undefined;
   addFoto(id: string, url: string): Caso | undefined;
   appendHistorial(id: string, cambio: HistorialCambio, extraPatch?: Partial<Caso>): Caso | undefined;
+  hydrate(rows: Caso[]): void;
 }
 
 export class InMemoryCasoRepository implements ICasoRepository {
   private casos: Caso[] = structuredClone(CASOS_SEED);
   private seq = 100;
+
+  hydrate(rows: Caso[]): void {
+    this.casos = structuredClone(rows);
+    this.seq = Math.max(100, rows.length + 50);
+  }
 
   findAll(): Caso[] {
     return [...this.casos];
@@ -39,6 +46,7 @@ export class InMemoryCasoRepository implements ICasoRepository {
 
   create(caso: Caso): Caso {
     this.casos.unshift(caso);
+    persistCaso(caso);
     return caso;
   }
 
@@ -56,6 +64,7 @@ export class InMemoryCasoRepository implements ICasoRepository {
       ...patch,
       updatedAt: new Date().toISOString(),
     };
+    persistCaso(this.casos[idx]!);
     return this.casos[idx];
   }
 

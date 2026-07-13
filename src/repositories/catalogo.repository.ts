@@ -1,5 +1,11 @@
 import { ASEGURADORAS_SEED } from '../data/aseguradoras.seed';
 import { CIUDADES_CATALOGO_SEED } from '../data/ciudades-catalogo.seed';
+import {
+  persistAseguradora,
+  persistCiudad,
+  persistDeleteAseguradora,
+  persistDeleteCiudad,
+} from '../db/persist';
 import type { Aseguradora, CiudadCatalogo } from '../types/catalogo';
 
 export interface CreateAseguradoraInput {
@@ -32,11 +38,6 @@ export interface UpdateCiudadInput {
   activa?: boolean;
 }
 
-/**
- * Repositorio de catálogos de referencia.
- * Hoy: arrays en RAM clonados del seed.
- * Después: implementar la misma interfaz contra Postgres/etc.
- */
 export interface ICatalogoRepository {
   listAseguradoras(soloActivas?: boolean): Aseguradora[];
   findAseguradoraById(id: string): Aseguradora | undefined;
@@ -51,6 +52,8 @@ export interface ICatalogoRepository {
   createCiudad(input: CreateCiudadInput): CiudadCatalogo;
   updateCiudad(id: string, input: UpdateCiudadInput): CiudadCatalogo | undefined;
   deleteCiudad(id: string): boolean;
+
+  hydrate(aseguradoras: Aseguradora[], ciudades: CiudadCatalogo[]): void;
 }
 
 function slugId(prefix: string, nombre: string): string {
@@ -67,6 +70,11 @@ function slugId(prefix: string, nombre: string): string {
 export class InMemoryCatalogoRepository implements ICatalogoRepository {
   private aseguradoras: Aseguradora[] = structuredClone(ASEGURADORAS_SEED);
   private ciudades: CiudadCatalogo[] = structuredClone(CIUDADES_CATALOGO_SEED);
+
+  hydrate(aseguradoras: Aseguradora[], ciudades: CiudadCatalogo[]): void {
+    this.aseguradoras = structuredClone(aseguradoras);
+    this.ciudades = structuredClone(ciudades);
+  }
 
   listAseguradoras(soloActivas = true): Aseguradora[] {
     return this.aseguradoras
@@ -94,6 +102,7 @@ export class InMemoryCatalogoRepository implements ICatalogoRepository {
       activa: input.activa ?? true,
     };
     this.aseguradoras.push(row);
+    persistAseguradora(row);
     return row;
   }
 
@@ -110,6 +119,7 @@ export class InMemoryCatalogoRepository implements ICatalogoRepository {
     }
     if (input.whatsapp !== undefined) row.whatsapp = input.whatsapp?.trim() || null;
     if (input.activa !== undefined) row.activa = input.activa;
+    persistAseguradora(row);
     return row;
   }
 
@@ -117,6 +127,7 @@ export class InMemoryCatalogoRepository implements ICatalogoRepository {
     const idx = this.aseguradoras.findIndex((a) => a.id === id);
     if (idx < 0) return false;
     this.aseguradoras.splice(idx, 1);
+    persistDeleteAseguradora(id);
     return true;
   }
 
@@ -143,6 +154,7 @@ export class InMemoryCatalogoRepository implements ICatalogoRepository {
       activa: input.activa ?? true,
     };
     this.ciudades.push(row);
+    persistCiudad(row);
     return row;
   }
 
@@ -152,6 +164,7 @@ export class InMemoryCatalogoRepository implements ICatalogoRepository {
     if (input.nombre !== undefined) row.nombre = input.nombre.trim();
     if (input.area !== undefined) row.area = input.area.trim() || row.area;
     if (input.activa !== undefined) row.activa = input.activa;
+    persistCiudad(row);
     return row;
   }
 
@@ -159,6 +172,7 @@ export class InMemoryCatalogoRepository implements ICatalogoRepository {
     const idx = this.ciudades.findIndex((c) => c.id === id);
     if (idx < 0) return false;
     this.ciudades.splice(idx, 1);
+    persistDeleteCiudad(id);
     return true;
   }
 }

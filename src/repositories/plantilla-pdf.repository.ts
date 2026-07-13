@@ -1,4 +1,5 @@
 import { PLANTILLAS_PDF_SEED } from '../data/plantillas-pdf.seed';
+import { persistDeletePlantilla, persistPlantilla } from '../db/persist';
 import {
   EMPTY_PLANTILLA_EXTRAS,
   type PlantillaPdfCobro,
@@ -22,6 +23,10 @@ type BrandingPatch = Partial<{
 export class InMemoryPlantillaPdfRepository {
   private rows: PlantillaPdfCobro[] = structuredClone(PLANTILLAS_PDF_SEED);
 
+  hydrate(rows: PlantillaPdfCobro[]): void {
+    this.rows = structuredClone(rows);
+  }
+
   listByEmpresa(empresaId: string): PlantillaPdfCobro[] {
     return this.rows
       .filter((r) => r.empresaId === empresaId)
@@ -36,7 +41,6 @@ export class InMemoryPlantillaPdfRepository {
     return this.rows.find((r) => r.id === id);
   }
 
-  /** Plantilla general (aseguradoraId null). */
   findDefault(empresaId: string): PlantillaPdfCobro | undefined {
     return this.rows.find((r) => r.empresaId === empresaId && r.aseguradoraId === null);
   }
@@ -81,10 +85,13 @@ export class InMemoryPlantillaPdfRepository {
         textoHeader: patch.textoHeader ?? 'Factura para cobro',
         textoFooter: patch.textoFooter ?? '',
         tipoPlantilla: patch.tipoPlantilla ?? 'tabla_operativa',
-        extras: patch.extras ? { ...EMPTY_PLANTILLA_EXTRAS, ...patch.extras } : { ...EMPTY_PLANTILLA_EXTRAS },
+        extras: patch.extras
+          ? { ...EMPTY_PLANTILLA_EXTRAS, ...patch.extras }
+          : { ...EMPTY_PLANTILLA_EXTRAS },
         updatedAt: now,
       };
       this.rows.push(created);
+      persistPlantilla(created);
       return created;
     }
     const prev = this.rows[idx]!;
@@ -93,19 +100,20 @@ export class InMemoryPlantillaPdfRepository {
       ...patch,
       extras: patch.extras
         ? { ...EMPTY_PLANTILLA_EXTRAS, ...prev.extras, ...patch.extras }
-        : prev.extras ?? { ...EMPTY_PLANTILLA_EXTRAS },
+        : (prev.extras ?? { ...EMPTY_PLANTILLA_EXTRAS }),
       empresaId,
       aseguradoraId,
       updatedAt: now,
     };
+    persistPlantilla(this.rows[idx]!);
     return this.rows[idx]!;
   }
 
-  /** Solo permite borrar overrides (no la general). */
   deleteOverride(id: string): boolean {
     const row = this.findById(id);
     if (!row || row.aseguradoraId === null) return false;
     this.rows = this.rows.filter((r) => r.id !== id);
+    persistDeletePlantilla(id);
     return true;
   }
 }

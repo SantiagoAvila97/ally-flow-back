@@ -38,6 +38,15 @@ export const env = {
   corsOrigin: required('CORS_ORIGIN', 'http://localhost:4200'),
   nodeEnv,
   isProd,
+  /** dev | qa | prod — etiqueta de entorno (logs / demos). */
+  appEnv: (process.env.APP_ENV ?? (isProd ? 'prod' : 'dev')).toLowerCase(),
+  /** Postgres (Neon / Railway). Vacío = modo in-memory. */
+  databaseUrl: process.env.DATABASE_URL ?? '',
+  /** Neon y la mayoría de hosts cloud requieren SSL. */
+  databaseSsl:
+    process.env.DATABASE_SSL === 'true' ||
+    process.env.DATABASE_SSL === '1' ||
+    Boolean(process.env.DATABASE_URL?.includes('sslmode=require')),
   /** Opcional: mejora el pin exacto. Sin key se usa embed de Google por búsqueda. */
   googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY ?? '',
 } as const;

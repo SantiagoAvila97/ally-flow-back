@@ -67,10 +67,17 @@ export const USERS_SEED: User[] = [
   },
 ];
 
+/** Runtime store (puede hidratarse desde Postgres). */
+let usersStore: User[] = structuredClone(USERS_SEED);
+
+export function hydrateUsers(rows: User[]): void {
+  usersStore = structuredClone(rows);
+}
+
 export function findUserByEmail(email: string): User | undefined {
-  return USERS_SEED.find((u) => u.email.toLowerCase() === email.toLowerCase());
+  return usersStore.find((u) => u.email.toLowerCase() === email.toLowerCase());
 }
 
 export function findUserById(id: string): User | undefined {
-  return USERS_SEED.find((u) => u.id === id);
+  return usersStore.find((u) => u.id === id);
 }

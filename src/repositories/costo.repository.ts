@@ -1,4 +1,11 @@
 import { CATEGORIAS_COSTO_SEED, ITEMS_COSTO_SEED } from '../data/costos.seed';
+import {
+  persistCategoria,
+  persistDeleteCategoria,
+  persistDeleteItem,
+  persistDeleteItemsByCategoria,
+  persistItem,
+} from '../db/persist';
 import type { CategoriaCosto, ItemCosto } from '../types/costo';
 
 export interface ICostoRepository {
@@ -16,12 +23,19 @@ export interface ICostoRepository {
   deleteItemsByCategoria(categoriaId: string): number;
 
   nextId(prefix: string): string;
+  hydrate(categorias: CategoriaCosto[], items: ItemCosto[]): void;
 }
 
 export class InMemoryCostoRepository implements ICostoRepository {
   private categorias: CategoriaCosto[] = structuredClone(CATEGORIAS_COSTO_SEED);
   private items: ItemCosto[] = structuredClone(ITEMS_COSTO_SEED);
   private seq = 500;
+
+  hydrate(categorias: CategoriaCosto[], items: ItemCosto[]): void {
+    this.categorias = structuredClone(categorias);
+    this.items = structuredClone(items);
+    this.seq = Math.max(500, categorias.length + items.length + 50);
+  }
 
   listCategorias(empresaId: string): CategoriaCosto[] {
     return this.categorias
@@ -35,6 +49,7 @@ export class InMemoryCostoRepository implements ICostoRepository {
 
   createCategoria(cat: CategoriaCosto): CategoriaCosto {
     this.categorias.push(cat);
+    persistCategoria(cat);
     return cat;
   }
 
@@ -46,13 +61,16 @@ export class InMemoryCostoRepository implements ICostoRepository {
       ...patch,
       updatedAt: new Date().toISOString(),
     };
+    persistCategoria(this.categorias[idx]!);
     return this.categorias[idx];
   }
 
   deleteCategoria(id: string): boolean {
     const before = this.categorias.length;
     this.categorias = this.categorias.filter((c) => c.id !== id);
-    return this.categorias.length < before;
+    const ok = this.categorias.length < before;
+    if (ok) persistDeleteCategoria(id);
+    return ok;
   }
 
   listItems(empresaId: string, categoriaId?: string): ItemCosto[] {
@@ -68,6 +86,7 @@ export class InMemoryCostoRepository implements ICostoRepository {
 
   createItem(item: ItemCosto): ItemCosto {
     this.items.push(item);
+    persistItem(item);
     return item;
   }
 
@@ -79,19 +98,24 @@ export class InMemoryCostoRepository implements ICostoRepository {
       ...patch,
       updatedAt: new Date().toISOString(),
     };
+    persistItem(this.items[idx]!);
     return this.items[idx];
   }
 
   deleteItem(id: string): boolean {
     const before = this.items.length;
     this.items = this.items.filter((i) => i.id !== id);
-    return this.items.length < before;
+    const ok = this.items.length < before;
+    if (ok) persistDeleteItem(id);
+    return ok;
   }
 
   deleteItemsByCategoria(categoriaId: string): number {
     const before = this.items.length;
     this.items = this.items.filter((i) => i.categoriaId !== categoriaId);
-    return before - this.items.length;
+    const n = before - this.items.length;
+    if (n > 0) persistDeleteItemsByCategoria(categoriaId);
+    return n;
   }
 
   nextId(prefix: string): string {
