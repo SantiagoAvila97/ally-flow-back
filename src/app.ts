@@ -4,8 +4,10 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { env } from './config/env';
+import { hasDatabase } from './db/pool';
 import { errorHandler } from './middlewares/error.middleware';
 import apiRoutes from './routes';
+import { APP_VERSION } from './version';
 
 export function createApp() {
   const app = express();
@@ -49,6 +51,22 @@ export function createApp() {
 
   app.use(cookieParser());
   app.use(express.json({ limit: '4mb' }));
+
+  // Health sin rate-limit (Railway lo consulta al desplegar).
+  app.get('/api/health', (_req, res) => {
+    res.status(200).json({
+      ok: true,
+      status: 'ok',
+      service: 'ally-flow-api',
+      version: APP_VERSION,
+      appEnv: env.appEnv,
+      database: hasDatabase() ? 'postgres' : 'memory',
+      time: new Date().toISOString(),
+    });
+  });
+  app.get('/health', (_req, res) => {
+    res.status(200).json({ ok: true, status: 'ok' });
+  });
 
   const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,

@@ -13,8 +13,9 @@ import { APP_VERSION } from '../version';
 
 const router = Router();
 
+/** También en router por compatibilidad; el de app.ts es el del healthcheck (sin rate-limit). */
 router.get('/health', (_req, res) => {
-  res.json({
+  res.status(200).json({
     ok: true,
     status: 'ok',
     service: 'ally-flow-api',

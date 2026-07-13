@@ -25,10 +25,12 @@ DO $$
 BEGIN
   IF EXISTS (
     SELECT 1 FROM information_schema.tables
-    WHERE table_name = 'aseguradoras'
+    WHERE table_schema = 'public' AND table_name = 'aseguradoras'
   ) AND NOT EXISTS (
     SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'aseguradoras' AND column_name = 'empresa_id'
+    WHERE table_schema = 'public'
+      AND table_name = 'aseguradoras'
+      AND column_name = 'empresa_id'
   ) THEN
     ALTER TABLE aseguradoras ADD COLUMN empresa_id TEXT REFERENCES empresas (id);
     -- Filas legacy globales → DEMO (o primera empresa)
@@ -44,14 +46,21 @@ BEGIN
 
   -- Quitar UNIQUE global en nombre si existía
   ALTER TABLE aseguradoras DROP CONSTRAINT IF EXISTS aseguradoras_nombre_key;
+
+  -- Índice por tenant (solo si ya existe empresa_id)
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'aseguradoras'
+      AND column_name = 'empresa_id'
+  ) THEN
+    EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS aseguradoras_empresa_nombre_uidx
+      ON aseguradoras (empresa_id, lower(nombre))';
+  END IF;
 EXCEPTION
   WHEN undefined_table THEN
     NULL;
 END $$;
-
-CREATE UNIQUE INDEX IF NOT EXISTS aseguradoras_empresa_nombre_uidx
-  ON aseguradoras (empresa_id, lower(nombre));
-
 -- NIT en empresas
 DO $$
 BEGIN

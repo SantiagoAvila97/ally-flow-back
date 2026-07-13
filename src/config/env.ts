@@ -35,10 +35,11 @@ const isDeployed = appEnv === 'qa' || appEnv === 'prod';
 function resolveJwtSecret(): string {
   const value = process.env.JWT_SECRET;
   const weak = 'ally-flow-dev-secret-change-in-production';
-  if (isProd || isProdApp) {
+  // Solo PROD de producto exige secreto fuerte (QA usa Docker con NODE_ENV=production también).
+  if (isProdApp) {
     if (!value || value === weak || value.length < 32) {
       throw new Error(
-        'JWT_SECRET must be set to a strong value (≥32 chars) in production',
+        'JWT_SECRET must be set to a strong value (≥32 chars) when APP_ENV=prod',
       );
     }
     return value;

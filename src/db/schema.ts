@@ -29,9 +29,8 @@ CREATE TABLE IF NOT EXISTS aseguradoras (
   activa BOOLEAN NOT NULL DEFAULT TRUE
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS aseguradoras_empresa_nombre_uidx
-  ON aseguradoras (empresa_id, lower(nombre));
-
+-- Índice único (empresa_id, nombre) se crea en migrate patches
+-- después de asegurar la columna en DBs legadas.
 CREATE TABLE IF NOT EXISTS ciudades (
   id TEXT PRIMARY KEY,
   nombre TEXT NOT NULL,

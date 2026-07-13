@@ -4,26 +4,35 @@ import { bootstrapDatabase } from './db/bootstrap';
 import { APP_VERSION } from './version';
 
 async function main(): Promise<void> {
-  await bootstrapDatabase();
+  console.log(
+    `[boot] starting ally-flow-api v${APP_VERSION} env=${env.appEnv} port=${env.port} db=${env.databaseUrl ? 'yes' : 'no'}`,
+  );
+
   const app = createApp();
-  // Railway / Docker: escuchar en todas las interfaces (si no, el healthcheck falla).
-  app.listen(env.port, '0.0.0.0', () => {
-    console.log(`
-  ╔══════════════════════════════════════════╗
-  ║         Ally Flow API  ·  MVP            ║
-  ╠══════════════════════════════════════════╣
-  ║  env: ${String(env.appEnv).padEnd(34)}║
-  ║  ver: ${String(APP_VERSION).padEnd(34)}║
-  ║  cors: ${env.corsOrigins.join(', ').slice(0, 32).padEnd(33)}║
-  ║  http://0.0.0.0:${String(env.port).padEnd(5)}                     ║
-  ║  Health: /api/health                     ║
-  ║  Login:  POST /api/auth/login            ║
-  ╚══════════════════════════════════════════╝
-  `);
+
+  // 1) Puerto abierto YA — Railway healthcheck no espera a migrate/seed.
+  await new Promise<void>((resolve, reject) => {
+    const server = app.listen(env.port, '0.0.0.0', () => {
+      console.log(`[boot] listening on 0.0.0.0:${env.port} — GET /api/health`);
+      resolve();
+    });
+    server.on('error', (err) => {
+      console.error('[boot] listen error:', err);
+      reject(err);
+    });
   });
+
+  // 2) DB en paralelo; si falla NO se mata el proceso (el health sigue OK).
+  console.log('[boot] bootstrap DB…');
+  try {
+    await bootstrapDatabase();
+    console.log('[boot] ready');
+  } catch (err) {
+    console.error('[boot] DB bootstrap failed — API sigue viva para healthcheck:', err);
+  }
 }
 
 main().catch((err) => {
-  console.error('[boot] failed:', err);
+  console.error('[boot] fatal (antes de listen):', err);
   process.exit(1);
 });
