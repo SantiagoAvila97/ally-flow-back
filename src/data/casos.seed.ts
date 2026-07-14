@@ -1064,6 +1064,30 @@ function expandDefsWithMix(defs: CasoDemoDef[], tag: string): CasoDemoDef[] {
     }
   }
 
+  // Embudo reciente garantizado (filtros 7d/30d siempre ven por facturar / pendiente).
+  const forceRecent: { estado: EstadoCaso; day: number }[] = [
+    { estado: 'PendienteDocumentoCobro', day: 1 },
+    { estado: 'PendienteDocumentoCobro', day: 2 },
+    { estado: 'PendienteRecepcionPago', day: 3 },
+    { estado: 'PendienteRecepcionPago', day: 4 },
+    { estado: 'PendienteConfirmacionAsegurado', day: 5 },
+    { estado: 'PendienteConfirmacionAsegurado', day: 6 },
+  ];
+  const used = new Set<number>();
+  for (const f of forceRecent) {
+    const idx = slots.findIndex(
+      (s, i) => s.estado === f.estado && !used.has(i) && s.seedDaysBack > 7,
+    );
+    const pick =
+      idx >= 0
+        ? idx
+        : slots.findIndex((s, i) => s.estado === f.estado && !used.has(i));
+    if (pick >= 0) {
+      used.add(pick);
+      slots[pick]!.seedDaysBack = f.day;
+    }
+  }
+
   return slots.map((slot, idx) => {
     const base = defs[idx % defs.length]!;
     const n = idx + 1;

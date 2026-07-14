@@ -90,6 +90,14 @@ function tecnicoNombre(id: string | null): string | null {
   return findUserById(id)?.nombre ?? null;
 }
 
+function isBacklogEstado(estado: EstadoCaso): boolean {
+  return (
+    ESTADOS_ENVIAR_COBRO.includes(estado) ||
+    ESTADOS_PENDIENTE_PAGO.includes(estado) ||
+    ESTADOS_OPERACION.includes(estado)
+  );
+}
+
 export class BalanceService {
   getResumen(
     user: PublicUser,
@@ -98,9 +106,17 @@ export class BalanceService {
     const r: BalanceRango =
       typeof rango === 'string' ? { periodo: rango } : rango;
     const { desde, hasta } = resolveRange(r);
-    const casos = casoRepository
-      .findByEmpresa(requireTenantEmpresaId(user))
-      .filter((c) => inRange(c, desde, hasta));
+    const todos = casoRepository.findByEmpresa(requireTenantEmpresaId(user));
+
+    /**
+     * Periodo aplica a Pagadas / utilidad / pagos.
+     * Por facturar, Pendiente de pago y “en campo” son backlog actual (abiertos),
+     * sin filtrar por fecha — si no, tickets quietos desaparecen del embudo.
+     */
+    const cobradosPeriodo = todos.filter(
+      (c) => c.estado === 'Cobrado' && inRange(c, desde, hasta),
+    );
+    const backlog = todos.filter((c) => isBacklogEstado(c.estado));
 
     const totales = {
       pendienteEnviarCobro: 0,
@@ -112,20 +128,20 @@ export class BalanceService {
       porCobrar: 0,
       casosPorCobrar: 0,
       casosEnOperacion: 0,
-      casosTotal: casos.length,
+      casosTotal: cobradosPeriodo.length + backlog.length,
       pagoTecnicos: 0,
       materiales: 0,
       utilidadOperativa: 0,
     };
 
-    for (const c of casos) {
-      const ing = ingresoCaso(c);
+    for (const c of cobradosPeriodo) {
+      totales.casosCobrados += 1;
+      totales.ingresosCobrados += ingresoCaso(c);
+    }
 
-      // Cobrado = la aseguradora/cliente pagó (no es liquidación al técnico).
-      if (c.estado === 'Cobrado') {
-        totales.casosCobrados += 1;
-        totales.ingresosCobrados += ing;
-      } else if (ESTADOS_ENVIAR_COBRO.includes(c.estado)) {
+    for (const c of backlog) {
+      const ing = ingresoCaso(c);
+      if (ESTADOS_ENVIAR_COBRO.includes(c.estado)) {
         totales.casosPendienteEnviarCobro += 1;
         totales.pendienteEnviarCobro += ing;
       } else if (ESTADOS_PENDIENTE_PAGO.includes(c.estado)) {
@@ -140,7 +156,7 @@ export class BalanceService {
     totales.casosPorCobrar = totales.casosPendienteEnviarCobro + totales.casosPendientePago;
 
     const asegMap = new Map<string, BalanceResumen['porAseguradora'][0]>();
-    for (const c of casos) {
+    const touchAseg = (c: (typeof todos)[0]) => {
       const nombre = c.aseguradora || 'Sin dato';
       const row = asegMap.get(nombre) ?? {
         nombre,
@@ -155,6 +171,15 @@ export class BalanceService {
       else if (ESTADOS_ENVIAR_COBRO.includes(c.estado)) row.pendienteEnviarCobro += ing;
       else if (ESTADOS_PENDIENTE_PAGO.includes(c.estado)) row.pendientePago += ing;
       asegMap.set(nombre, row);
+    };
+    for (const c of cobradosPeriodo) touchAseg(c);
+    for (const c of backlog) {
+      if (
+        ESTADOS_ENVIAR_COBRO.includes(c.estado) ||
+        ESTADOS_PENDIENTE_PAGO.includes(c.estado)
+      ) {
+        touchAseg(c);
+      }
     }
 
     const porAseguradora = [...asegMap.values()].sort(
@@ -163,26 +188,25 @@ export class BalanceService {
         (a.ingresoCobrado + a.pendienteEnviarCobro + a.pendientePago),
     );
 
-    const casosPendienteEnviar = casos
+    const casosPendienteEnviar = backlog
       .filter((c) => ESTADOS_ENVIAR_COBRO.includes(c.estado))
       .map(toFila)
       .sort((a, b) => b.ingreso - a.ingreso);
 
-    const casosPendientePago = casos
+    const casosPendientePago = backlog
       .filter((c) => ESTADOS_PENDIENTE_PAGO.includes(c.estado))
       .map(toFila)
       .sort((a, b) => b.ingreso - a.ingreso);
 
-    const cobradosRecientes = casos
-      .filter((c) => c.estado === 'Cobrado')
+    const cobradosRecientes = cobradosPeriodo
       .map(toFila)
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
       .slice(0, 10);
 
-    // Utilidad / pago técnicos / materiales: solo casos Pagados (cliente).
+    // Utilidad / pago técnicos / materiales: solo casos Pagados (cliente) del periodo.
     // Si falta liquidar técnico, no se suma utilidad (ni se trata null como 0).
-    const casosOperacion = casos
-      .filter((c) => c.estado === 'Cobrado' && !c.esGarantia)
+    const casosOperacion = cobradosPeriodo
+      .filter((c) => !c.esGarantia)
       .map((c) => ({
         id: c.id,
         titulo: c.titulo,
