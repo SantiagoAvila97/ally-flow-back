@@ -22,10 +22,20 @@ export async function ensureTenantOwners(): Promise<void> {
     const byId = findUserById(owner.id);
 
     if (byNew) {
-      if (!byNew.esOwner || byNew.role !== 'ADMIN') {
-        const patched = { ...byNew, esOwner: true, role: 'ADMIN' as const };
+      const needsOwner = !byNew.esOwner || byNew.role !== 'ADMIN';
+      const needsNombre = byNew.nombre !== owner.nombre;
+      if (needsOwner || needsNombre) {
+        const patched = {
+          ...byNew,
+          nombre: owner.nombre,
+          esOwner: true,
+          role: 'ADMIN' as const,
+        };
         upsertUserInStore(patched);
         if (hasDatabase()) await upsertUser(patched);
+        if (needsNombre) {
+          console.log(`[db] tenant OWNER nombre sync ${owner.email} → ${owner.nombre}`);
+        }
       }
       continue;
     }
@@ -34,7 +44,7 @@ export async function ensureTenantOwners(): Promise<void> {
       const patched = {
         ...byLegacy,
         email: owner.email,
-        nombre: byLegacy.nombre || owner.nombre,
+        nombre: owner.nombre,
         esOwner: true,
         role: 'ADMIN' as const,
       };

@@ -44,7 +44,7 @@ export const USERS_SEED: User[] = [
   {
     id: 'usr-full-owner',
     email: 'owner@fullsoluciones.com',
-    nombre: 'Sara Owner Full',
+    nombre: 'Anderson Gutierrez',
     passwordHash: hash('super123'),
     role: 'ADMIN',
     empresaId: EMPRESA_FULL,
@@ -84,7 +84,7 @@ export const USERS_SEED: User[] = [
   {
     id: 'usr-demo-owner',
     email: 'owner@demo.local',
-    nombre: 'Sofía Owner Demo',
+    nombre: 'Santiago Avila',
     passwordHash: hash('super123'),
     role: 'ADMIN',
     empresaId: EMPRESA_DEMO,
