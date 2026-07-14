@@ -3,7 +3,7 @@ import cookieParser from 'cookie-parser';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
-import { env } from './config/env';
+import { env, isCorsOriginAllowed } from './config/env';
 import { getDatabaseStatus } from './db/runtime-status';
 import { errorHandler } from './middlewares/error.middleware';
 import apiRoutes from './routes';
@@ -34,13 +34,15 @@ export function createApp() {
           return;
         }
         const normalized = origin.replace(/\/$/, '');
-        const allowed = env.corsOrigins.some((o) => o === normalized || o === '*');
-        if (allowed) {
+        if (isCorsOriginAllowed(normalized, env.corsOrigins)) {
           // Con credentials debe devolver el origin concreto, no `*`.
           callback(null, normalized);
           return;
         }
-        console.warn(`[cors] blocked origin: ${origin} (allowed: ${env.corsOrigins.join(', ')})`);
+        console.warn(
+          `[cors] blocked origin: ${origin} (allowed: ${env.corsOrigins.join(', ')}` +
+            `${env.isProdApp ? '' : ' + *.vercel.app'})`,
+        );
         callback(null, false);
       },
       credentials: true,

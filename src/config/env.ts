@@ -54,7 +54,7 @@ function resolveCorsOrigins(): string[] {
     .map((s) => s.trim().replace(/\/$/, ''))
     .filter(Boolean);
 
-  // LOCAL + QA: permitir ng serve. PROD: solo CORS_ORIGIN (front Vercel prod).
+  // LOCAL + QA: ng serve. PROD: solo CORS_ORIGIN (front Vercel prod fijo).
   const localDev = isProdApp
     ? []
     : ['http://localhost:4200', 'http://127.0.0.1:4200'];
@@ -64,6 +64,19 @@ function resolveCorsOrigins(): string[] {
     return ['http://localhost:4200'];
   }
   return merged;
+}
+
+/** Preview Vercel (`*.vercel.app`) solo en QA/local — los deploys cambian de subdominio. */
+export function isCorsOriginAllowed(origin: string, allowList: string[]): boolean {
+  const normalized = origin.replace(/\/$/, '');
+  if (allowList.some((o) => o === normalized || o === '*')) return true;
+  if (isProdApp) return false;
+  try {
+    const host = new URL(normalized).hostname.toLowerCase();
+    return host === 'vercel.app' || host.endsWith('.vercel.app');
+  } catch {
+    return false;
+  }
 }
 
 /**
