@@ -434,7 +434,7 @@ export class CasosService {
       throw new AppError(400, 'Debes capturar al menos una firma para cerrar');
     }
 
-    const nextEstado = caso.esGarantia ? 'CerradoGarantia' : 'PendienteDocumentoCobro';
+    const nextEstado = caso.esGarantia ? 'Cobrado' : 'PendienteDocumentoCobro';
     const now = new Date().toISOString();
     const quien =
       input.tipoFirma === 'TECNICO'
@@ -449,13 +449,14 @@ export class CasosService {
         nextEstado,
         user,
         caso.esGarantia
-          ? `Garantía cerrada (${quien})`
+          ? `Garantía cerrada (${quien}) — vuelve a Pagada`
           : `Caso cerrado — pendiente documento de cobro (${quien})`,
       ),
       {
         firmaTecnicoUrl: firmaTecnico,
         firmaAtendidoUrl: firmaAtendido,
         gestionadoAt: now,
+        ...(caso.esGarantia ? { esGarantia: false } : {}),
       },
     );
     if (!updated) throw new AppError(404, 'Caso no encontrado');
@@ -634,11 +635,7 @@ export class CasosService {
         firmaAtendidoUrl: null,
         firmaTecnicoUrl: null,
         gestionadoAt: null,
-        lineasCobro: [],
-        documentoCobroGeneradoAt: null,
-        montoEstimado: null,
-        pagoTecnico: null,
-        gastosMateriales: [],
+        // Conserva cobro/ops: al cerrar la garantía el caso vuelve a Pagada (Cobrado).
       },
     );
 

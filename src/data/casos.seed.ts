@@ -109,7 +109,9 @@ function buildTimeline(
     );
     t.push(hist(twoDaysAgo, 'Cobrado', staff.asesorId, staff.asesorNombre, 'Cobrado'));
     t.push(hist(dayAgo, 'EnGarantia', ctx.adminId, ctx.adminNombre, 'Garantia'));
-    t.push(hist(now, 'CerradoGarantia', staff.tecnicoId, staff.tecnicoNombre, 'Garantia cerrada'));
+    t.push(
+      hist(now, 'Cobrado', staff.tecnicoId, staff.tecnicoNombre, 'Garantia cerrada — vuelve a Pagada'),
+    );
     return t;
   }
 
@@ -806,8 +808,8 @@ const DEFS_DEMO: CasoDemoDef[] = [
     esGarantia: true,
   },
   {
-    estado: 'CerradoGarantia',
-    titulo: 'Garantía asistencia - cerrada',
+    estado: 'Cobrado',
+    titulo: 'Garantía asistencia - cerrada (Pagada)',
     numeroAseguradora: 'DEMO-CG-001',
     aseguradora: 'Sura Seguros',
     titularNombre: 'María Cano',
@@ -815,15 +817,16 @@ const DEFS_DEMO: CasoDemoDef[] = [
     direccion: 'Av. Las Palmas Km 5',
     ciudad: 'Medellín',
     categoriaServicio: 'Plomería',
-    observaciones: 'Garantía finalizada.',
+    observaciones: 'Garantía finalizada; vuelve a Pagada.',
     conTecnico: true,
     conFotos: true,
     conFirma: true,
-    esGarantia: true,
+    esGarantia: false,
+    lineas: PACK.medio,
   },
   {
-    estado: 'CerradoGarantia',
-    titulo: 'Garantía destape - cerrada',
+    estado: 'Cobrado',
+    titulo: 'Garantía destape - cerrada (Pagada)',
     numeroAseguradora: 'DEMO-CG-002',
     aseguradora: 'Mapfre Colombia',
     titularNombre: 'Sebastián Ruiz',
@@ -831,11 +834,12 @@ const DEFS_DEMO: CasoDemoDef[] = [
     direccion: 'Calle 33 #75-20',
     ciudad: 'Medellín',
     categoriaServicio: 'Electricidad',
-    observaciones: 'Cerrada.',
+    observaciones: 'Cerrada; vuelve a Pagada.',
     conTecnico: true,
     conFotos: true,
     conFirma: true,
-    esGarantia: true,
+    esGarantia: false,
+    lineas: PACK.medio,
   },
 ];
 
