@@ -31,18 +31,33 @@ const weekAgo = ago(7);
 const twoWeeksAgo = ago(14);
 
 /**
- * Distribuye createdAt / updatedAt en ~6 semanas con hora distinta por índice.
- * Así la bandeja no muestra todo con la misma fecha.
+ * Distribuye createdAt / updatedAt en ~6 meses (ventana 180 días).
+ * Índices bajos = más recientes → filtros 7d / 30d / 90d / mes muestran volúmenes distintos.
  */
-function fechasParaIndice(index: number): { createdAt: string; updatedAt: string } {
-  const daysBack = (index * 11 + (index % 7) * 3) % 42; // 0–41 días
-  const hours = (index * 5 + 3) % 20; // 0–19 h
+function fechasParaIndice(
+  index: number,
+  total = DEMO_CASOS_TARGET,
+): { createdAt: string; updatedAt: string } {
+  const t = Math.max(total, 2);
+  const span = 180;
+  const base = Math.round(((index - 1) / (t - 1)) * span);
+  const jitter = ((index * 7) % 5) - 2; // -2..+2
+  const daysBack = Math.min(span, Math.max(0, base + jitter));
+  const hours = (index * 5 + 3) % 20;
   const minutes = (index * 13) % 55;
   const updatedAt = ago(daysBack, hours, minutes);
-  const createdLagDays = 1 + (index % 6);
+  const createdLagDays = 1 + (index % 8);
   const createdAt = ago(daysBack + createdLagDays, (hours + 2) % 20, minutes);
   return { createdAt, updatedAt };
 }
+
+/** ISO relativo a un ancla (updatedAt del caso), daysBack > 0 = anterior. */
+function relativeTo(anchorIso: string, daysBack: number, hours = 0): string {
+  const ms = Date.parse(anchorIso) - daysBack * 86_400_000 - hours * 3_600_000;
+  return new Date(ms).toISOString();
+}
+
+const DEMO_CASOS_TARGET = 130;
 
 interface EmpresaSeedCtx {
   empresaId: string;
@@ -88,58 +103,59 @@ function buildTimeline(
   ctx: EmpresaSeedCtx,
   estado: EstadoCaso,
   staff: { asesorId: string; asesorNombre: string; tecnicoId: string; tecnicoNombre: string },
+  anchorIso: string,
 ): HistorialCambio[] {
+  const t0 = relativeTo(anchorIso, 12);
+  const t1 = relativeTo(anchorIso, 8);
+  const t2 = relativeTo(anchorIso, 4);
+  const t3 = relativeTo(anchorIso, 2);
+  const tNow = relativeTo(anchorIso, 0);
+
   const t: HistorialCambio[] = [
-    hist(threeDaysAgo, 'PendienteAsignacion', staff.asesorId, staff.asesorNombre, 'Caso creado'),
+    hist(t0, 'PendienteAsignacion', staff.asesorId, staff.asesorNombre, 'Caso creado'),
   ];
 
   if (estado === 'PendienteAsignacion') return t;
 
   t.push(
-    hist(twoDaysAgo, 'Asignado', ctx.adminId, ctx.adminNombre, `Asignado a ${staff.tecnicoNombre}`),
+    hist(t1, 'Asignado', ctx.adminId, ctx.adminNombre, `Asignado a ${staff.tecnicoNombre}`),
   );
   if (estado === 'Asignado') return t;
 
   if (estado === 'EnGarantia') {
-    t.push(hist(dayAgo, 'EnGestion', staff.tecnicoId, staff.tecnicoNombre, 'Gestion'));
+    t.push(hist(t2, 'EnGestion', staff.tecnicoId, staff.tecnicoNombre, 'Gestion'));
     t.push(
-      hist(dayAgo, 'PendienteDocumentoCobro', staff.tecnicoId, staff.tecnicoNombre, 'Completado'),
+      hist(t2, 'PendienteDocumentoCobro', staff.tecnicoId, staff.tecnicoNombre, 'Completado'),
     );
-    t.push(hist(dayAgo, 'Cobrado', staff.asesorId, staff.asesorNombre, 'Cobrado'));
-    t.push(hist(now, 'EnGarantia', ctx.adminId, ctx.adminNombre, 'Reabierto por garantia'));
+    t.push(hist(t3, 'Cobrado', staff.asesorId, staff.asesorNombre, 'Cobrado'));
+    t.push(hist(tNow, 'EnGarantia', ctx.adminId, ctx.adminNombre, 'Reabierto por garantia'));
     return t;
   }
 
   if (estado === 'CerradoGarantia') {
-    t.push(hist(twoDaysAgo, 'EnGestion', staff.tecnicoId, staff.tecnicoNombre, 'Gestion'));
+    t.push(hist(t1, 'EnGestion', staff.tecnicoId, staff.tecnicoNombre, 'Gestion'));
     t.push(
-      hist(
-        twoDaysAgo,
-        'PendienteDocumentoCobro',
-        staff.tecnicoId,
-        staff.tecnicoNombre,
-        'Completado',
-      ),
+      hist(t1, 'PendienteDocumentoCobro', staff.tecnicoId, staff.tecnicoNombre, 'Completado'),
     );
-    t.push(hist(twoDaysAgo, 'Cobrado', staff.asesorId, staff.asesorNombre, 'Cobrado'));
-    t.push(hist(dayAgo, 'EnGarantia', ctx.adminId, ctx.adminNombre, 'Garantia'));
+    t.push(hist(t2, 'Cobrado', staff.asesorId, staff.asesorNombre, 'Cobrado'));
+    t.push(hist(t3, 'EnGarantia', ctx.adminId, ctx.adminNombre, 'Garantia'));
     t.push(
-      hist(now, 'Cobrado', staff.tecnicoId, staff.tecnicoNombre, 'Garantia cerrada — vuelve a Pagada'),
+      hist(tNow, 'Cobrado', staff.tecnicoId, staff.tecnicoNombre, 'Garantia cerrada — vuelve a Pagada'),
     );
     return t;
   }
 
-  t.push(hist(dayAgo, 'EnGestion', staff.tecnicoId, staff.tecnicoNombre, 'Gestion iniciada'));
+  t.push(hist(t2, 'EnGestion', staff.tecnicoId, staff.tecnicoNombre, 'Gestion iniciada'));
   if (estado === 'EnGestion') return t;
 
   t.push(
-    hist(dayAgo, 'PendienteDocumentoCobro', staff.tecnicoId, staff.tecnicoNombre, 'Gestion completada'),
+    hist(t2, 'PendienteDocumentoCobro', staff.tecnicoId, staff.tecnicoNombre, 'Gestion completada'),
   );
   if (estado === 'PendienteDocumentoCobro') return t;
 
   t.push(
     hist(
-      dayAgo,
+      t3,
       'PendienteConfirmacionAsegurado',
       staff.asesorId,
       staff.asesorNombre,
@@ -150,7 +166,7 @@ function buildTimeline(
 
   t.push(
     hist(
-      dayAgo,
+      t3,
       'PendienteRecepcionPago',
       staff.asesorId,
       staff.asesorNombre,
@@ -159,7 +175,7 @@ function buildTimeline(
   );
   if (estado === 'PendienteRecepcionPago') return t;
 
-  t.push(hist(now, 'Cobrado', staff.asesorId, staff.asesorNombre, 'Marcado cobrado'));
+  t.push(hist(tNow, 'Cobrado', staff.asesorId, staff.asesorNombre, 'Marcado cobrado'));
   return t;
 }
 
@@ -239,52 +255,6 @@ function buildCaso(ctx: EmpresaSeedCtx, def: CasoDemoDef, index: number): Caso {
     tecnicoNombre: findUserById(tecnicoPoolId)?.nombre ?? 'Técnico',
   };
 
-  /** Cobranza, visita cerrada o garantía (conserva cobro/ops previos). */
-  const conOps = comercial || !!def.conFirma || !!def.esGarantia;
-  const pagoTecnico = conOps
-    ? [55_000, 70_000, 85_000, 95_000, 110_000, 125_000, 140_000][index % 7]! +
-      (index % 4) * 7_500
-    : null;
-  const matA = 18_000 + (index % 6) * 8_500;
-  const matB = 12_000 + (index % 5) * 6_000;
-  const matC = 22_000 + (index % 3) * 11_000;
-  const gastosMateriales = conOps
-    ? [
-        {
-          id: `mat-${ctx.prefix}-${index}-1`,
-          descripcion: [
-            'Factura ferretería / consumibles',
-            'Tubos y conexiones',
-            'Cableado y terminales',
-            'Sellos / teflón / adhesivos',
-          ][index % 4]!,
-          monto: matA,
-          fotoUrl: demoFoto(`Mat ${index}-A`),
-        },
-        {
-          id: `mat-${ctx.prefix}-${index}-2`,
-          descripcion: [
-            'Repuestos / kit de reparación',
-            'Válvula / cartucho',
-            'Breakers / tomas',
-            'Adaptadores y uniones',
-          ][index % 4]!,
-          monto: matB,
-          fotoUrl: demoFoto(`Mat ${index}-B`),
-        },
-        ...(index % 2 === 0
-          ? [
-              {
-                id: `mat-${ctx.prefix}-${index}-3`,
-                descripcion: 'Transporte / flete de materiales',
-                monto: matC,
-                fotoUrl: demoFoto(`Mat ${index}-C`),
-              },
-            ]
-          : []),
-      ]
-    : [];
-
   const lineasGarantia =
     def.esGarantia && !comercial ? (def.lineas ?? PACK.medio) : lineas;
   const lineasFinal = comercial ? lineas : lineasGarantia;
@@ -292,6 +262,90 @@ function buildCaso(ctx: EmpresaSeedCtx, def: CasoDemoDef, index: number): Caso {
     comercial || (def.esGarantia && lineasFinal.length)
       ? sumLineas(lineasFinal)
       : null;
+  const ingresoOps = lineasFinal.length ? sumLineas(lineasFinal) : 0;
+
+  /** Cobranza, visita cerrada o garantía (conserva cobro/ops previos). */
+  const conOps = comercial || !!def.conFirma || !!def.esGarantia;
+  // Pago técnico ~25–40% del ingreso del servicio (piso/techo).
+  let pagoTecnico: number | null = null;
+  if (conOps) {
+    const pct = 0.25 + (index % 4) * 0.05;
+    const raw =
+      ingresoOps > 0 ? Math.round((ingresoOps * pct) / 1000) * 1000 : 80_000 + (index % 5) * 10_000;
+    pagoTecnico = Math.min(450_000, Math.max(45_000, raw));
+  }
+
+  // Materiales solo en ~60% de casos con ops; suma ~8–20% del ingreso.
+  const withMateriales = conOps && ingresoOps > 0 && index % 5 < 3;
+  let gastosMateriales: Caso['gastosMateriales'] = [];
+  if (withMateriales) {
+    const matsPct = 0.08 + (index % 5) * 0.03; // 8–20%
+    const budget = Math.max(15_000, Math.round((ingresoOps * matsPct) / 1000) * 1000);
+    const descA = [
+      'Factura ferretería / consumibles',
+      'Tubos y conexiones',
+      'Cableado y terminales',
+      'Sellos / teflón / adhesivos',
+    ][index % 4]!;
+    const descB = [
+      'Repuestos / kit de reparación',
+      'Válvula / cartucho',
+      'Breakers / tomas',
+      'Adaptadores y uniones',
+    ][index % 4]!;
+    if (index % 3 === 0) {
+      const a = Math.round(budget * 0.55);
+      const b = budget - a;
+      gastosMateriales = [
+        {
+          id: `mat-${ctx.prefix}-${index}-1`,
+          descripcion: descA,
+          monto: a,
+          fotoUrl: demoFoto(`Mat ${index}-A`),
+        },
+        {
+          id: `mat-${ctx.prefix}-${index}-2`,
+          descripcion: descB,
+          monto: b,
+          fotoUrl: demoFoto(`Mat ${index}-B`),
+        },
+      ];
+    } else if (index % 3 === 1) {
+      const a = Math.round(budget * 0.45);
+      const b = Math.round(budget * 0.35);
+      const c = budget - a - b;
+      gastosMateriales = [
+        {
+          id: `mat-${ctx.prefix}-${index}-1`,
+          descripcion: descA,
+          monto: a,
+          fotoUrl: demoFoto(`Mat ${index}-A`),
+        },
+        {
+          id: `mat-${ctx.prefix}-${index}-2`,
+          descripcion: descB,
+          monto: b,
+          fotoUrl: demoFoto(`Mat ${index}-B`),
+        },
+        {
+          id: `mat-${ctx.prefix}-${index}-3`,
+          descripcion: 'Transporte / flete de materiales',
+          monto: c,
+          fotoUrl: demoFoto(`Mat ${index}-C`),
+        },
+      ];
+    } else {
+      gastosMateriales = [
+        {
+          id: `mat-${ctx.prefix}-${index}-1`,
+          descripcion: descA,
+          monto: budget,
+          fotoUrl: demoFoto(`Mat ${index}-A`),
+        },
+      ];
+    }
+  }
+
   return {
     id,
     titulo: def.titulo,
@@ -331,7 +385,7 @@ function buildCaso(ctx: EmpresaSeedCtx, def: CasoDemoDef, index: number): Caso {
         : null,
     pagoTecnico,
     gastosMateriales,
-    historialCambios: buildTimeline(ctx, def.estado, staff),
+    historialCambios: buildTimeline(ctx, def.estado, staff, updatedAt),
     createdAt,
     updatedAt,
   };
@@ -896,29 +950,79 @@ const CTX_DEMO: EmpresaSeedCtx = {
 
 /**
  * Persistencia MVP: se clona en RAM al arrancar (`InMemoryCasoRepository`).
- * Solo tenant DEMO: ~80 casos para ejercitar paginación (pageSize máx. 50).
+ * Solo tenant DEMO: ~130 casos (cuotas de estado) repartidos en ~6 meses.
  * Full Soluciones y demás tenants: sin casos por defecto.
  */
-function expandDefs(defs: CasoDemoDef[], target: number, tag: string): CasoDemoDef[] {
-  if (defs.length >= target) return defs.slice(0, target);
-  const extra: CasoDemoDef[] = [];
-  let i = 0;
-  while (defs.length + extra.length < target) {
-    const base = defs[i % defs.length]!;
-    const n = defs.length + extra.length + 1;
-    extra.push({
-      ...base,
-      titulo: `${base.titulo} · lote ${n}`,
+const PACK_LIST: LineaCobro[][] = [
+  PACK.chico,
+  PACK.medio,
+  PACK.grande,
+  PACK.xl,
+  PACK.mega,
+  PACK.vip,
+  PACK.light,
+  PACK.mixto,
+  PACK.alto,
+  PACK.office,
+];
+
+/** Cuotas ≈130: 75 Pagadas + resto del embudo + 2 garantía abierta. */
+const DEMO_MIX: { estado: EstadoCaso; count: number; esGarantia?: boolean }[] = [
+  { estado: 'Cobrado', count: 75 },
+  { estado: 'PendienteRecepcionPago', count: 9 },
+  { estado: 'PendienteConfirmacionAsegurado', count: 9 },
+  { estado: 'PendienteDocumentoCobro', count: 12 },
+  { estado: 'EnGestion', count: 10 },
+  { estado: 'Asignado', count: 8 },
+  { estado: 'PendienteAsignacion', count: 5 },
+  { estado: 'Asignado', count: 2, esGarantia: true },
+];
+
+function expandDefsWithMix(defs: CasoDemoDef[], tag: string): CasoDemoDef[] {
+  const slots: { estado: EstadoCaso; esGarantia: boolean }[] = [];
+  for (const q of DEMO_MIX) {
+    for (let i = 0; i < q.count; i++) {
+      slots.push({ estado: q.estado, esGarantia: !!q.esGarantia });
+    }
+  }
+  // Shuffle estable (no Math.random) para demos reproducibles.
+  for (let i = slots.length - 1; i > 0; i--) {
+    const j = (i * 17 + 3) % (i + 1);
+    const tmp = slots[i]!;
+    slots[i] = slots[j]!;
+    slots[j] = tmp;
+  }
+
+  return slots.map((slot, idx) => {
+    const base = defs[idx % defs.length]!;
+    const n = idx + 1;
+    const comercial =
+      slot.estado === 'PendienteDocumentoCobro' ||
+      slot.estado === 'PendienteConfirmacionAsegurado' ||
+      slot.estado === 'PendienteRecepcionPago' ||
+      slot.estado === 'Cobrado' ||
+      slot.esGarantia;
+    const { updatedAt: _drop, ...rest } = base;
+    return {
+      ...rest,
+      estado: slot.estado,
+      esGarantia: slot.esGarantia,
+      titulo: slot.esGarantia
+        ? `Garantía · ${base.titulo} · ${n}`
+        : `${base.titulo} · lote ${n}`,
       numeroAseguradora: `${tag}-${String(n).padStart(3, '0')}`,
       titularNombre: `${base.titularNombre} (${n})`,
-    });
-    i += 1;
-  }
-  return [...defs, ...extra];
+      conTecnico: slot.estado !== 'PendienteAsignacion',
+      conFotos:
+        comercial || slot.estado === 'EnGestion' || slot.estado === 'Asignado',
+      conFirma: comercial,
+      lineas: comercial ? PACK_LIST[idx % PACK_LIST.length] : undefined,
+    };
+  });
 }
 
-const DEFS_DEMO_80 = expandDefs(DEFS_DEMO, 80, 'DEMO');
+const DEFS_DEMO_130 = expandDefsWithMix(DEFS_DEMO, 'DEMO');
 
 export const CASOS_SEED: Caso[] = [
-  ...DEFS_DEMO_80.map((d, i) => buildCaso(CTX_DEMO, d, i + 1)),
+  ...DEFS_DEMO_130.map((d, i) => buildCaso(CTX_DEMO, d, i + 1)),
 ];
