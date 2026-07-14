@@ -2,6 +2,7 @@ import { findUserById } from '../data/users.seed';
 import { casoRepository } from '../repositories/caso.repository';
 import type {
   BalancePeriodo,
+  BalanceRango,
   BalanceResumen,
   BalanceTecnicoResumen,
 } from '../types/balance';
@@ -28,9 +29,21 @@ const ESTADOS_PENDIENTE_PAGO: EstadoCaso[] = [
   'PendienteRecepcionPago',
 ];
 
-/** Inicio del periodo (inclusive), o null = sin filtro. */
+function parseDayStart(isoDate: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate.trim());
+  if (!m) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0, 0);
+}
+
+function parseDayEnd(isoDate: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate.trim());
+  if (!m) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 23, 59, 59, 999);
+}
+
+/** Inicio del periodo preset (inclusive), o null = sin filtro inferior. */
 function periodStart(periodo: BalancePeriodo): Date | null {
-  if (periodo === 'all') return null;
+  if (periodo === 'all' || periodo === 'custom') return null;
   if (periodo === 'month') {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
@@ -39,14 +52,24 @@ function periodStart(periodo: BalancePeriodo): Date | null {
   return new Date(Date.now() - days * 86_400_000);
 }
 
+function resolveRange(rango: BalanceRango): { desde: Date | null; hasta: Date | null } {
+  const desdeCustom = rango.desde ? parseDayStart(rango.desde) : null;
+  const hastaCustom = rango.hasta ? parseDayEnd(rango.hasta) : null;
+  if (desdeCustom || hastaCustom || rango.periodo === 'custom') {
+    return { desde: desdeCustom, hasta: hastaCustom };
+  }
+  return { desde: periodStart(rango.periodo), hasta: null };
+}
+
 function fechaReferencia(caso: Caso): Date {
-  if (caso.gestionadoAt) return new Date(caso.gestionadoAt);
   return new Date(caso.updatedAt);
 }
 
-function inPeriod(caso: Caso, desde: Date | null): boolean {
-  if (!desde) return true;
-  return fechaReferencia(caso) >= desde;
+function inRange(caso: Caso, desde: Date | null, hasta: Date | null): boolean {
+  const ref = fechaReferencia(caso);
+  if (desde && ref < desde) return false;
+  if (hasta && ref > hasta) return false;
+  return true;
 }
 
 function toFila(caso: Caso) {
@@ -68,11 +91,16 @@ function tecnicoNombre(id: string | null): string | null {
 }
 
 export class BalanceService {
-  getResumen(user: PublicUser, periodo: BalancePeriodo = '90d'): BalanceResumen {
-    const desde = periodStart(periodo);
+  getResumen(
+    user: PublicUser,
+    rango: BalanceRango | BalancePeriodo = '90d',
+  ): BalanceResumen {
+    const r: BalanceRango =
+      typeof rango === 'string' ? { periodo: rango } : rango;
+    const { desde, hasta } = resolveRange(r);
     const casos = casoRepository
       .findByEmpresa(requireTenantEmpresaId(user))
-      .filter((c) => inPeriod(c, desde));
+      .filter((c) => inRange(c, desde, hasta));
 
     const totales = {
       pendienteEnviarCobro: 0,
@@ -196,7 +224,7 @@ export class BalanceService {
     const porTecnico = [...techMap.values()].sort((a, b) => b.aPagar - a.aPagar);
 
     return {
-      periodo,
+      periodo: r.periodo,
       generadoAt: new Date().toISOString(),
       totales,
       porAseguradora,
@@ -208,18 +236,25 @@ export class BalanceService {
     };
   }
 
-  getResumenTecnico(user: PublicUser, periodo: BalancePeriodo = 'month'): BalanceTecnicoResumen {
+  getResumenTecnico(
+    user: PublicUser,
+    rango: BalanceRango | BalancePeriodo = 'month',
+  ): BalanceTecnicoResumen {
     if (user.role !== 'TECNICO') {
       throw new AppError(403, 'Solo el técnico puede ver su balance de pagos');
     }
-    const desde = periodStart(periodo);
+    const r: BalanceRango =
+      typeof rango === 'string' ? { periodo: rango } : rango;
+    const { desde, hasta } = resolveRange(r);
     const casos = casoRepository
       .findByEmpresa(requireTenantEmpresaId(user))
       .filter((c) => c.tecnicoId === user.id)
       .filter((c) => Boolean(c.gestionadoAt))
       .filter((c) => {
-        if (!desde) return true;
-        return new Date(c.gestionadoAt!) >= desde;
+        const ref = new Date(c.gestionadoAt!);
+        if (desde && ref < desde) return false;
+        if (hasta && ref > hasta) return false;
+        return true;
       })
       .sort(
         (a, b) =>
@@ -248,7 +283,7 @@ export class BalanceService {
     });
 
     return {
-      periodo,
+      periodo: r.periodo,
       generadoAt: new Date().toISOString(),
       totales: {
         aPagar,

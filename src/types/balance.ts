@@ -1,7 +1,15 @@
 import type { EstadoCaso } from './caso';
 
 /** `month` = mes calendario en curso; `7d`/`30d`/`90d` = rolling; `all` = sin filtro. */
-export type BalancePeriodo = '7d' | '30d' | '90d' | 'month' | 'all';
+export type BalancePeriodo = '7d' | '30d' | '90d' | 'month' | 'all' | 'custom';
+
+export interface BalanceRango {
+  periodo: BalancePeriodo;
+  /** YYYY-MM-DD inclusive start (optional). */
+  desde?: string | null;
+  /** YYYY-MM-DD inclusive end (optional). */
+  hasta?: string | null;
+}
 
 export interface BalanceTotales {
   /** PendienteDocumentoCobro: falta armar / enviar el PDF de cobro */

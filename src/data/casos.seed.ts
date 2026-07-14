@@ -37,14 +37,20 @@ const twoWeeksAgo = ago(14);
 function fechasParaIndice(
   index: number,
   total = DEMO_CASOS_TARGET,
+  seedDaysBack?: number,
 ): { createdAt: string; updatedAt: string } {
-  const t = Math.max(total, 2);
-  const span = 180;
-  const base = Math.round(((index - 1) / (t - 1)) * span);
-  const jitter = ((index * 7) % 5) - 2; // -2..+2
-  const daysBack = Math.min(span, Math.max(0, base + jitter));
   const hours = (index * 5 + 3) % 20;
   const minutes = (index * 13) % 55;
+  let daysBack: number;
+  if (seedDaysBack != null && Number.isFinite(seedDaysBack)) {
+    daysBack = Math.max(0, Math.min(180, Math.round(seedDaysBack)));
+  } else {
+    const t = Math.max(total, 2);
+    const span = 180;
+    const base = Math.round(((index - 1) / (t - 1)) * span);
+    const jitter = ((index * 7) % 5) - 2;
+    daysBack = Math.min(span, Math.max(0, base + jitter));
+  }
   const updatedAt = ago(daysBack, hours, minutes);
   const createdLagDays = 1 + (index % 8);
   const createdAt = ago(daysBack + createdLagDays, (hours + 2) % 20, minutes);
@@ -87,6 +93,8 @@ interface CasoDemoDef {
   /** Paquete de líneas de cobro (solo estados comerciales / cobrado). */
   lineas?: LineaCobro[];
   updatedAt?: string;
+  /** Días hacia atrás desde hoy (fuerza fecha del caso en seed). */
+  seedDaysBack?: number;
 }
 
 function hist(
@@ -242,7 +250,11 @@ function buildCaso(ctx: EmpresaSeedCtx, def: CasoDemoDef, index: number): Caso {
     def.estado === 'Cobrado';
 
   const lineas = comercial ? (def.lineas ?? PACK.medio) : [];
-  const { createdAt, updatedAt: autoUpdated } = fechasParaIndice(index);
+  const { createdAt, updatedAt: autoUpdated } = fechasParaIndice(
+    index,
+    DEMO_CASOS_TARGET,
+    def.seedDaysBack,
+  );
   const updatedAt = def.updatedAt ?? autoUpdated;
   const updatedMs = Date.parse(updatedAt);
 
@@ -966,31 +978,90 @@ const PACK_LIST: LineaCobro[][] = [
   PACK.office,
 ];
 
-/** Cuotas ≈130: 75 Pagadas + resto del embudo + 2 garantía abierta. */
-const DEMO_MIX: { estado: EstadoCaso; count: number; esGarantia?: boolean }[] = [
-  { estado: 'Cobrado', count: 75 },
-  { estado: 'PendienteRecepcionPago', count: 9 },
-  { estado: 'PendienteConfirmacionAsegurado', count: 9 },
-  { estado: 'PendienteDocumentoCobro', count: 12 },
-  { estado: 'EnGestion', count: 10 },
-  { estado: 'Asignado', count: 8 },
-  { estado: 'PendienteAsignacion', count: 5 },
-  { estado: 'Asignado', count: 2, esGarantia: true },
+/** Mix por mes (~20). Embudo visible también en filtros 7d/30d. */
+const MONTHLY_MIX: { estado: EstadoCaso; count: number; esGarantia?: boolean }[] = [
+  { estado: 'Cobrado', count: 12 },
+  { estado: 'PendienteRecepcionPago', count: 2 },
+  { estado: 'PendienteConfirmacionAsegurado', count: 2 },
+  { estado: 'PendienteDocumentoCobro', count: 2 },
+  { estado: 'EnGestion', count: 1 },
+  { estado: 'Asignado', count: 1 },
 ];
 
-function expandDefsWithMix(defs: CasoDemoDef[], tag: string): CasoDemoDef[] {
-  const slots: { estado: EstadoCaso; esGarantia: boolean }[] = [];
-  for (const q of DEMO_MIX) {
-    for (let i = 0; i < q.count; i++) {
-      slots.push({ estado: q.estado, esGarantia: !!q.esGarantia });
-    }
+/** Extra para ~130 y ~75 Pagadas. */
+const EXTRA_MIX: { estado: EstadoCaso; count: number; esGarantia?: boolean; month: number }[] = [
+  { estado: 'Cobrado', count: 3, month: 0 },
+  { estado: 'PendienteAsignacion', count: 5, month: 1 },
+  { estado: 'Asignado', count: 2, month: 0, esGarantia: true },
+];
+
+function shuffleStable<T>(arr: T[], salt: number): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = (i * 17 + salt * 3) % (i + 1);
+    const tmp = a[i]!;
+    a[i] = a[j]!;
+    a[j] = tmp;
   }
-  // Shuffle estable (no Math.random) para demos reproducibles.
-  for (let i = slots.length - 1; i > 0; i--) {
-    const j = (i * 17 + 3) % (i + 1);
-    const tmp = slots[i]!;
-    slots[i] = slots[j]!;
-    slots[j] = tmp;
+  return a;
+}
+
+function expandDefsWithMix(defs: CasoDemoDef[], tag: string): CasoDemoDef[] {
+  type Slot = {
+    estado: EstadoCaso;
+    esGarantia: boolean;
+    seedDaysBack: number;
+  };
+  const slots: Slot[] = [];
+
+  for (let month = 0; month < 6; month++) {
+    const monthSlots: { estado: EstadoCaso; esGarantia: boolean }[] = [];
+    for (const q of MONTHLY_MIX) {
+      for (let i = 0; i < q.count; i++) {
+        monthSlots.push({ estado: q.estado, esGarantia: !!q.esGarantia });
+      }
+    }
+    const shuffled = shuffleStable(monthSlots, month + 1);
+
+    const embudoFirst = [...shuffled].sort((a, b) => {
+      const rank = (st: EstadoCaso) =>
+        st === 'PendienteDocumentoCobro'
+          ? 0
+          : st === 'PendienteRecepcionPago'
+            ? 1
+            : st === 'PendienteConfirmacionAsegurado'
+              ? 2
+              : st === 'EnGestion'
+                ? 3
+                : 4;
+      return rank(a.estado) - rank(b.estado);
+    });
+    const ordered = month === 0 ? embudoFirst : shuffled;
+
+    ordered.forEach((slot, i) => {
+      let dayInMonth: number;
+      if (month === 0) {
+        if (i < 6) dayInMonth = 1 + i;
+        else dayInMonth = 7 + Math.floor(((i - 6) / Math.max(ordered.length - 6, 1)) * 20);
+      } else {
+        dayInMonth = 2 + Math.floor((i / Math.max(ordered.length - 1, 1)) * 26);
+      }
+      slots.push({
+        estado: slot.estado,
+        esGarantia: slot.esGarantia,
+        seedDaysBack: month * 30 + dayInMonth,
+      });
+    });
+  }
+
+  for (const q of EXTRA_MIX) {
+    for (let i = 0; i < q.count; i++) {
+      slots.push({
+        estado: q.estado,
+        esGarantia: !!q.esGarantia,
+        seedDaysBack: q.month * 30 + 3 + i * 4,
+      });
+    }
   }
 
   return slots.map((slot, idx) => {
@@ -1002,16 +1073,17 @@ function expandDefsWithMix(defs: CasoDemoDef[], tag: string): CasoDemoDef[] {
       slot.estado === 'PendienteRecepcionPago' ||
       slot.estado === 'Cobrado' ||
       slot.esGarantia;
-    const { updatedAt: _drop, ...rest } = base;
+    const { updatedAt: _drop, seedDaysBack: _d, ...rest } = base;
     return {
       ...rest,
       estado: slot.estado,
       esGarantia: slot.esGarantia,
+      seedDaysBack: slot.seedDaysBack,
       titulo: slot.esGarantia
-        ? `Garantía · ${base.titulo} · ${n}`
-        : `${base.titulo} · lote ${n}`,
-      numeroAseguradora: `${tag}-${String(n).padStart(3, '0')}`,
-      titularNombre: `${base.titularNombre} (${n})`,
+        ? 'Garantía · ' + base.titulo + ' · ' + n
+        : base.titulo + ' · lote ' + n,
+      numeroAseguradora: tag + '-' + String(n).padStart(3, '0'),
+      titularNombre: base.titularNombre + ' (' + n + ')',
       conTecnico: slot.estado !== 'PendienteAsignacion',
       conFotos:
         comercial || slot.estado === 'EnGestion' || slot.estado === 'Asignado',
