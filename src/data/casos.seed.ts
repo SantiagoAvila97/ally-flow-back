@@ -278,21 +278,19 @@ function buildCaso(ctx: EmpresaSeedCtx, def: CasoDemoDef, index: number): Caso {
 
   /** Cobranza, visita cerrada o garantía (conserva cobro/ops previos). */
   const conOps = comercial || !!def.conFirma || !!def.esGarantia;
-  // Pago técnico ~25–40% del ingreso del servicio (piso/techo).
+  // Pago técnico: tope duro 200.000 por servicio (piso ~70–120k).
   let pagoTecnico: number | null = null;
   if (conOps) {
-    const pct = 0.25 + (index % 4) * 0.05;
-    const raw =
-      ingresoOps > 0 ? Math.round((ingresoOps * pct) / 1000) * 1000 : 80_000 + (index % 5) * 10_000;
-    pagoTecnico = Math.min(450_000, Math.max(45_000, raw));
+    const band = [80_000, 100_000, 120_000, 150_000, 180_000, 200_000][index % 6]!;
+    pagoTecnico = band;
   }
 
-  // Materiales solo en ~60% de casos con ops; suma ~8–20% del ingreso.
-  const withMateriales = conOps && ingresoOps > 0 && index % 5 < 3;
+  // Materiales en casi todos los casos con ops; ~45–65% del ingreso (inventario alto).
+  const withMateriales = conOps && ingresoOps > 0 && index % 12 !== 0;
   let gastosMateriales: Caso['gastosMateriales'] = [];
   if (withMateriales) {
-    const matsPct = 0.08 + (index % 5) * 0.03; // 8–20%
-    const budget = Math.max(15_000, Math.round((ingresoOps * matsPct) / 1000) * 1000);
+    const matsPct = 0.45 + (index % 5) * 0.05; // 45–65%
+    const budget = Math.max(120_000, Math.round((ingresoOps * matsPct) / 1000) * 1000);
     const descA = [
       'Factura ferretería / consumibles',
       'Tubos y conexiones',
@@ -978,20 +976,25 @@ const PACK_LIST: LineaCobro[][] = [
   PACK.office,
 ];
 
-/** Mix por mes (~20). Embudo visible también en filtros 7d/30d. */
+/**
+ * Mix por mes (~20). Cada mes tiene embudo propio para que
+ * 7d / 30d / 90d / Todo muestren números distintos en TODOS los KPIs.
+ */
 const MONTHLY_MIX: { estado: EstadoCaso; count: number; esGarantia?: boolean }[] = [
-  { estado: 'Cobrado', count: 12 },
+  { estado: 'Cobrado', count: 11 },
   { estado: 'PendienteRecepcionPago', count: 2 },
   { estado: 'PendienteConfirmacionAsegurado', count: 2 },
   { estado: 'PendienteDocumentoCobro', count: 2 },
   { estado: 'EnGestion', count: 1 },
   { estado: 'Asignado', count: 1 },
+  { estado: 'PendienteAsignacion', count: 1 },
 ];
 
-/** Extra para ~130 y ~75 Pagadas. */
+/** Extra suelto para ~130 y volumen de Pagadas. */
 const EXTRA_MIX: { estado: EstadoCaso; count: number; esGarantia?: boolean; month: number }[] = [
-  { estado: 'Cobrado', count: 3, month: 0 },
-  { estado: 'PendienteAsignacion', count: 5, month: 1 },
+  { estado: 'Cobrado', count: 4, month: 0 },
+  { estado: 'Cobrado', count: 2, month: 1 },
+  { estado: 'Cobrado', count: 2, month: 2 },
   { estado: 'Asignado', count: 2, month: 0, esGarantia: true },
 ];
 
@@ -1006,6 +1009,14 @@ function shuffleStable<T>(arr: T[], salt: number): T[] {
   return a;
 }
 
+function isEmbudoEstado(st: EstadoCaso): boolean {
+  return (
+    st === 'PendienteDocumentoCobro' ||
+    st === 'PendienteRecepcionPago' ||
+    st === 'PendienteConfirmacionAsegurado'
+  );
+}
+
 function expandDefsWithMix(defs: CasoDemoDef[], tag: string): CasoDemoDef[] {
   type Slot = {
     estado: EstadoCaso;
@@ -1013,6 +1024,8 @@ function expandDefsWithMix(defs: CasoDemoDef[], tag: string): CasoDemoDef[] {
     seedDaysBack: number;
   };
   const slots: Slot[] = [];
+  /** ~28 días por "mes" para que el mes 1 entre parcialmente en 30d. */
+  const MONTH_SPAN = 28;
 
   for (let month = 0; month < 6; month++) {
     const monthSlots: { estado: EstadoCaso; esGarantia: boolean }[] = [];
@@ -1022,36 +1035,44 @@ function expandDefsWithMix(defs: CasoDemoDef[], tag: string): CasoDemoDef[] {
       }
     }
     const shuffled = shuffleStable(monthSlots, month + 1);
+    const embudo = shuffled.filter((s) => isEmbudoEstado(s.estado));
+    const otros = shuffled.filter((s) => !isEmbudoEstado(s.estado));
 
-    const embudoFirst = [...shuffled].sort((a, b) => {
-      const rank = (st: EstadoCaso) =>
-        st === 'PendienteDocumentoCobro'
-          ? 0
-          : st === 'PendienteRecepcionPago'
-            ? 1
-            : st === 'PendienteConfirmacionAsegurado'
-              ? 2
-              : st === 'EnGestion'
-                ? 3
-                : 4;
-      return rank(a.estado) - rank(b.estado);
-    });
-    const ordered = month === 0 ? embudoFirst : shuffled;
-
-    ordered.forEach((slot, i) => {
-      let dayInMonth: number;
-      if (month === 0) {
-        if (i < 6) dayInMonth = 1 + i;
-        else dayInMonth = 7 + Math.floor(((i - 6) / Math.max(ordered.length - 6, 1)) * 20);
-      } else {
-        dayInMonth = 2 + Math.floor((i / Math.max(ordered.length - 1, 1)) * 26);
+    if (month === 0) {
+      // 7d: 1 Doc + 1 Rec + 1 Conf (días 1–6)
+      // 30d: +resto embudo mes 0 (días 10–24) + cobrados/ops
+      const early: typeof shuffled = [];
+      const late: typeof shuffled = [];
+      for (const st of [
+        'PendienteDocumentoCobro',
+        'PendienteRecepcionPago',
+        'PendienteConfirmacionAsegurado',
+      ] as EstadoCaso[]) {
+        const ofSt = embudo.filter((s) => s.estado === st);
+        if (ofSt[0]) early.push(ofSt[0]);
+        for (const s of ofSt.slice(1)) late.push(s);
       }
-      slots.push({
-        estado: slot.estado,
-        esGarantia: slot.esGarantia,
-        seedDaysBack: month * 30 + dayInMonth,
+      early.forEach((slot, i) => {
+        slots.push({ ...slot, seedDaysBack: 1 + i * 2 }); // 1,3,5
       });
-    });
+      late.forEach((slot, i) => {
+        slots.push({ ...slot, seedDaysBack: 10 + i * 4 }); // 10,14,18…
+      });
+      otros.forEach((slot, i) => {
+        const day = 6 + Math.floor((i / Math.max(otros.length - 1, 1)) * 21);
+        slots.push({ ...slot, seedDaysBack: day });
+      });
+    } else {
+      const ordered = [...embudo, ...otros];
+      ordered.forEach((slot, i) => {
+        const dayInMonth = 1 + Math.floor((i / Math.max(ordered.length - 1, 1)) * 26);
+        slots.push({
+          estado: slot.estado,
+          esGarantia: slot.esGarantia,
+          seedDaysBack: month * MONTH_SPAN + dayInMonth,
+        });
+      });
+    }
   }
 
   for (const q of EXTRA_MIX) {
@@ -1059,32 +1080,8 @@ function expandDefsWithMix(defs: CasoDemoDef[], tag: string): CasoDemoDef[] {
       slots.push({
         estado: q.estado,
         esGarantia: !!q.esGarantia,
-        seedDaysBack: q.month * 30 + 3 + i * 4,
+        seedDaysBack: q.month * MONTH_SPAN + 4 + i * 5,
       });
-    }
-  }
-
-  // Embudo reciente garantizado (filtros 7d/30d siempre ven por facturar / pendiente).
-  const forceRecent: { estado: EstadoCaso; day: number }[] = [
-    { estado: 'PendienteDocumentoCobro', day: 1 },
-    { estado: 'PendienteDocumentoCobro', day: 2 },
-    { estado: 'PendienteRecepcionPago', day: 3 },
-    { estado: 'PendienteRecepcionPago', day: 4 },
-    { estado: 'PendienteConfirmacionAsegurado', day: 5 },
-    { estado: 'PendienteConfirmacionAsegurado', day: 6 },
-  ];
-  const used = new Set<number>();
-  for (const f of forceRecent) {
-    const idx = slots.findIndex(
-      (s, i) => s.estado === f.estado && !used.has(i) && s.seedDaysBack > 7,
-    );
-    const pick =
-      idx >= 0
-        ? idx
-        : slots.findIndex((s, i) => s.estado === f.estado && !used.has(i));
-    if (pick >= 0) {
-      used.add(pick);
-      slots[pick]!.seedDaysBack = f.day;
     }
   }
 

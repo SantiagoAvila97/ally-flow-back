@@ -90,14 +90,6 @@ function tecnicoNombre(id: string | null): string | null {
   return findUserById(id)?.nombre ?? null;
 }
 
-function isBacklogEstado(estado: EstadoCaso): boolean {
-  return (
-    ESTADOS_ENVIAR_COBRO.includes(estado) ||
-    ESTADOS_PENDIENTE_PAGO.includes(estado) ||
-    ESTADOS_OPERACION.includes(estado)
-  );
-}
-
 export class BalanceService {
   getResumen(
     user: PublicUser,
@@ -106,17 +98,9 @@ export class BalanceService {
     const r: BalanceRango =
       typeof rango === 'string' ? { periodo: rango } : rango;
     const { desde, hasta } = resolveRange(r);
-    const todos = casoRepository.findByEmpresa(requireTenantEmpresaId(user));
-
-    /**
-     * Periodo aplica a Pagadas / utilidad / pagos.
-     * Por facturar, Pendiente de pago y “en campo” son backlog actual (abiertos),
-     * sin filtrar por fecha — si no, tickets quietos desaparecen del embudo.
-     */
-    const cobradosPeriodo = todos.filter(
-      (c) => c.estado === 'Cobrado' && inRange(c, desde, hasta),
-    );
-    const backlog = todos.filter((c) => isBacklogEstado(c.estado));
+    const casos = casoRepository
+      .findByEmpresa(requireTenantEmpresaId(user))
+      .filter((c) => inRange(c, desde, hasta));
 
     const totales = {
       pendienteEnviarCobro: 0,
@@ -128,20 +112,20 @@ export class BalanceService {
       porCobrar: 0,
       casosPorCobrar: 0,
       casosEnOperacion: 0,
-      casosTotal: cobradosPeriodo.length + backlog.length,
+      casosTotal: casos.length,
       pagoTecnicos: 0,
       materiales: 0,
       utilidadOperativa: 0,
     };
 
-    for (const c of cobradosPeriodo) {
-      totales.casosCobrados += 1;
-      totales.ingresosCobrados += ingresoCaso(c);
-    }
-
-    for (const c of backlog) {
+    for (const c of casos) {
       const ing = ingresoCaso(c);
-      if (ESTADOS_ENVIAR_COBRO.includes(c.estado)) {
+
+      // Cobrado = la aseguradora/cliente pagó (no es liquidación al técnico).
+      if (c.estado === 'Cobrado') {
+        totales.casosCobrados += 1;
+        totales.ingresosCobrados += ing;
+      } else if (ESTADOS_ENVIAR_COBRO.includes(c.estado)) {
         totales.casosPendienteEnviarCobro += 1;
         totales.pendienteEnviarCobro += ing;
       } else if (ESTADOS_PENDIENTE_PAGO.includes(c.estado)) {
@@ -156,7 +140,7 @@ export class BalanceService {
     totales.casosPorCobrar = totales.casosPendienteEnviarCobro + totales.casosPendientePago;
 
     const asegMap = new Map<string, BalanceResumen['porAseguradora'][0]>();
-    const touchAseg = (c: (typeof todos)[0]) => {
+    for (const c of casos) {
       const nombre = c.aseguradora || 'Sin dato';
       const row = asegMap.get(nombre) ?? {
         nombre,
@@ -171,15 +155,6 @@ export class BalanceService {
       else if (ESTADOS_ENVIAR_COBRO.includes(c.estado)) row.pendienteEnviarCobro += ing;
       else if (ESTADOS_PENDIENTE_PAGO.includes(c.estado)) row.pendientePago += ing;
       asegMap.set(nombre, row);
-    };
-    for (const c of cobradosPeriodo) touchAseg(c);
-    for (const c of backlog) {
-      if (
-        ESTADOS_ENVIAR_COBRO.includes(c.estado) ||
-        ESTADOS_PENDIENTE_PAGO.includes(c.estado)
-      ) {
-        touchAseg(c);
-      }
     }
 
     const porAseguradora = [...asegMap.values()].sort(
@@ -188,25 +163,37 @@ export class BalanceService {
         (a.ingresoCobrado + a.pendienteEnviarCobro + a.pendientePago),
     );
 
-    const casosPendienteEnviar = backlog
+    const casosPendienteEnviar = casos
       .filter((c) => ESTADOS_ENVIAR_COBRO.includes(c.estado))
       .map(toFila)
       .sort((a, b) => b.ingreso - a.ingreso);
 
-    const casosPendientePago = backlog
+    const casosPendientePago = casos
       .filter((c) => ESTADOS_PENDIENTE_PAGO.includes(c.estado))
       .map(toFila)
       .sort((a, b) => b.ingreso - a.ingreso);
 
-    const cobradosRecientes = cobradosPeriodo
+    const cobradosRecientes = casos
+      .filter((c) => c.estado === 'Cobrado')
       .map(toFila)
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
       .slice(0, 10);
 
-    // Utilidad / pago técnicos / materiales: solo casos Pagados (cliente) del periodo.
-    // Si falta liquidar técnico, no se suma utilidad (ni se trata null como 0).
-    const casosOperacion = cobradosPeriodo
-      .filter((c) => !c.esGarantia)
+    // Pago técnicos + materiales: todos los casos del periodo (no dependen del cobro del cliente).
+    for (const c of casos) {
+      if (c.pagoTecnico != null) totales.pagoTecnicos += c.pagoTecnico;
+      totales.materiales += totalMateriales(c.gastosMateriales);
+    }
+
+    // Utilidad de caja (OPS): solo cuenta el ingreso Pagado (cliente).
+    // Descuenta TODO el costo ops del periodo (técnicos + materiales), aunque parte
+    // esté en casos aún Pendiente de pago / por facturar (no es cobro cliente).
+    totales.utilidadOperativa =
+      totales.ingresosCobrados - totales.pagoTecnicos - totales.materiales;
+
+    // Detalle por caso: solo Pagadas (cliente).
+    const casosOperacion = casos
+      .filter((c) => c.estado === 'Cobrado' && !c.esGarantia)
       .map((c) => ({
         id: c.id,
         titulo: c.titulo,
@@ -223,19 +210,14 @@ export class BalanceService {
       }))
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
-    for (const c of casosOperacion) {
-      if (c.pagoTecnico == null) continue;
-      totales.pagoTecnicos += c.pagoTecnico;
-      totales.materiales += c.materiales;
-      totales.utilidadOperativa += c.utilidad ?? 0;
-    }
-
+    // Por técnico: a pagar = suma de pagos definidos en el periodo (con o sin cobro cliente).
     const techMap = new Map<string, BalanceResumen['porTecnico'][0]>();
-    for (const c of casosOperacion) {
+    for (const c of casos) {
       if (!c.tecnicoId) continue;
+      if (c.pagoTecnico == null && !c.gestionadoAt) continue;
       const row = techMap.get(c.tecnicoId) ?? {
         tecnicoId: c.tecnicoId,
-        tecnicoNombre: c.tecnicoNombre ?? 'Técnico',
+        tecnicoNombre: tecnicoNombre(c.tecnicoId) ?? 'Técnico',
         casos: 0,
         aPagar: 0,
         pendientesLiquidar: 0,
