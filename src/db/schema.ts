@@ -115,6 +115,8 @@ CREATE TABLE IF NOT EXISTS casos (
   monto_estimado NUMERIC,
   lineas_cobro JSONB NOT NULL DEFAULT '[]'::jsonb,
   documento_cobro_generado_at TIMESTAMPTZ,
+  pago_tecnico NUMERIC,
+  gastos_materiales JSONB NOT NULL DEFAULT '[]'::jsonb,
   historial_cambios JSONB NOT NULL DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL

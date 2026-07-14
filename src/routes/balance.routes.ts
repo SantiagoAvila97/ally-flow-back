@@ -5,8 +5,14 @@ import { requireRoles, requireTenant } from '../middlewares/role.middleware';
 
 const router = Router();
 
-router.use(authenticate, requireTenant, requireRoles('ADMIN'));
+router.use(authenticate, requireTenant);
 
-router.get('/', (req, res, next) => balanceController.resumen(req, res, next));
+router.get('/', requireRoles('ADMIN'), (req, res, next) =>
+  balanceController.resumen(req, res, next),
+);
+
+router.get('/tecnico', requireRoles('TECNICO'), (req, res, next) =>
+  balanceController.resumenTecnico(req, res, next),
+);
 
 export default router;

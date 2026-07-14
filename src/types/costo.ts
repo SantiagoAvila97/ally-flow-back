@@ -22,8 +22,6 @@ export interface ItemCosto {
   categoriaId: string;
   nombre: string;
   descripcion: string;
-  /** Costo interno para la empresa (COP) */
-  costoInterno: number;
   /** Precio sugerido al cliente / aseguradora (COP) */
   precioSugerido: number;
   /** und | metro | ml | servicio */
@@ -51,7 +49,6 @@ export interface CrearItemInput {
   categoriaId: string;
   nombre: string;
   descripcion: string;
-  costoInterno: number;
   precioSugerido: number;
   unidad: string;
   activo?: boolean;
@@ -61,7 +58,6 @@ export interface ActualizarItemInput {
   categoriaId?: string;
   nombre?: string;
   descripcion?: string;
-  costoInterno?: number;
   precioSugerido?: number;
   unidad?: string;
   activo?: boolean;

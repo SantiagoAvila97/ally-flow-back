@@ -64,6 +64,18 @@ router.patch(
   (req, res, next) => casosController.setLineasCobro(req, res, next),
 );
 
+router.patch(
+  '/:id/gastos-operacion',
+  requireRoles(...CASO_ACTION_ROLES.gastos_operacion),
+  (req, res, next) => casosController.setGastosOperacion(req, res, next),
+);
+
+router.post(
+  '/:id/gastos-materiales',
+  requireRoles(...CASO_ACTION_ROLES.materiales_adjuntar),
+  (req, res, next) => casosController.adjuntarMateriales(req, res, next),
+);
+
 router.get(
   '/:id/documento-cobro.pdf',
   requireRoles(...CASO_ACTION_ROLES.lineas_cobro),

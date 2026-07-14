@@ -1,5 +1,6 @@
 import type { Caso, EstadoCaso, HistorialCambio, LineaCobro } from '../types/caso';
 import { EMPRESA_DEMO } from './empresas.seed';
+import { DEMO_ASESOR_IDS, DEMO_TECNICO_IDS, findUserById } from './users.seed';
 
 /** Fechas relativas al arranque (mocks variados para ordenar en UI). */
 function ago(days: number, hours = 0, minutes = 0): string {
@@ -32,10 +33,9 @@ function fechasParaIndice(index: number): { createdAt: string; updatedAt: string
 interface EmpresaSeedCtx {
   empresaId: string;
   prefix: string;
-  asesorId: string;
-  asesorNombre: string;
-  tecnicoId: string;
-  tecnicoNombre: string;
+  /** Pool DEMO: se rota por índice de caso. */
+  asesorIds: readonly string[];
+  tecnicoIds: readonly string[];
   adminId: string;
   adminNombre: string;
 }
@@ -70,50 +70,80 @@ function hist(
   return { fecha, estado, usuarioId, usuarioNombre, nota };
 }
 
-function buildTimeline(ctx: EmpresaSeedCtx, estado: EstadoCaso): HistorialCambio[] {
+function buildTimeline(
+  ctx: EmpresaSeedCtx,
+  estado: EstadoCaso,
+  staff: { asesorId: string; asesorNombre: string; tecnicoId: string; tecnicoNombre: string },
+): HistorialCambio[] {
   const t: HistorialCambio[] = [
-    hist(threeDaysAgo, 'PendienteAsignacion', ctx.asesorId, ctx.asesorNombre, 'Caso creado'),
+    hist(threeDaysAgo, 'PendienteAsignacion', staff.asesorId, staff.asesorNombre, 'Caso creado'),
   ];
 
   if (estado === 'PendienteAsignacion') return t;
 
-  t.push(hist(twoDaysAgo, 'Asignado', ctx.adminId, ctx.adminNombre, `Asignado a ${ctx.tecnicoNombre}`));
+  t.push(
+    hist(twoDaysAgo, 'Asignado', ctx.adminId, ctx.adminNombre, `Asignado a ${staff.tecnicoNombre}`),
+  );
   if (estado === 'Asignado') return t;
 
   if (estado === 'EnGarantia') {
-    t.push(hist(dayAgo, 'EnGestion', ctx.tecnicoId, ctx.tecnicoNombre, 'Gestion'));
-    t.push(hist(dayAgo, 'PendienteDocumentoCobro', ctx.tecnicoId, ctx.tecnicoNombre, 'Completado'));
-    t.push(hist(dayAgo, 'Cobrado', ctx.asesorId, ctx.asesorNombre, 'Cobrado'));
+    t.push(hist(dayAgo, 'EnGestion', staff.tecnicoId, staff.tecnicoNombre, 'Gestion'));
+    t.push(
+      hist(dayAgo, 'PendienteDocumentoCobro', staff.tecnicoId, staff.tecnicoNombre, 'Completado'),
+    );
+    t.push(hist(dayAgo, 'Cobrado', staff.asesorId, staff.asesorNombre, 'Cobrado'));
     t.push(hist(now, 'EnGarantia', ctx.adminId, ctx.adminNombre, 'Reabierto por garantia'));
     return t;
   }
 
   if (estado === 'CerradoGarantia') {
-    t.push(hist(twoDaysAgo, 'EnGestion', ctx.tecnicoId, ctx.tecnicoNombre, 'Gestion'));
-    t.push(hist(twoDaysAgo, 'PendienteDocumentoCobro', ctx.tecnicoId, ctx.tecnicoNombre, 'Completado'));
-    t.push(hist(twoDaysAgo, 'Cobrado', ctx.asesorId, ctx.asesorNombre, 'Cobrado'));
+    t.push(hist(twoDaysAgo, 'EnGestion', staff.tecnicoId, staff.tecnicoNombre, 'Gestion'));
+    t.push(
+      hist(
+        twoDaysAgo,
+        'PendienteDocumentoCobro',
+        staff.tecnicoId,
+        staff.tecnicoNombre,
+        'Completado',
+      ),
+    );
+    t.push(hist(twoDaysAgo, 'Cobrado', staff.asesorId, staff.asesorNombre, 'Cobrado'));
     t.push(hist(dayAgo, 'EnGarantia', ctx.adminId, ctx.adminNombre, 'Garantia'));
-    t.push(hist(now, 'CerradoGarantia', ctx.tecnicoId, ctx.tecnicoNombre, 'Garantia cerrada'));
+    t.push(hist(now, 'CerradoGarantia', staff.tecnicoId, staff.tecnicoNombre, 'Garantia cerrada'));
     return t;
   }
 
-  t.push(hist(dayAgo, 'EnGestion', ctx.tecnicoId, ctx.tecnicoNombre, 'Gestion iniciada'));
+  t.push(hist(dayAgo, 'EnGestion', staff.tecnicoId, staff.tecnicoNombre, 'Gestion iniciada'));
   if (estado === 'EnGestion') return t;
 
-  t.push(hist(dayAgo, 'PendienteDocumentoCobro', ctx.tecnicoId, ctx.tecnicoNombre, 'Gestion completada'));
+  t.push(
+    hist(dayAgo, 'PendienteDocumentoCobro', staff.tecnicoId, staff.tecnicoNombre, 'Gestion completada'),
+  );
   if (estado === 'PendienteDocumentoCobro') return t;
 
   t.push(
-    hist(dayAgo, 'PendienteConfirmacionAsegurado', ctx.asesorId, ctx.asesorNombre, 'Documento de cobro generado'),
+    hist(
+      dayAgo,
+      'PendienteConfirmacionAsegurado',
+      staff.asesorId,
+      staff.asesorNombre,
+      'Documento de cobro generado',
+    ),
   );
   if (estado === 'PendienteConfirmacionAsegurado') return t;
 
   t.push(
-    hist(dayAgo, 'PendienteRecepcionPago', ctx.asesorId, ctx.asesorNombre, 'Confirmado por asegurado'),
+    hist(
+      dayAgo,
+      'PendienteRecepcionPago',
+      staff.asesorId,
+      staff.asesorNombre,
+      'Confirmado por asegurado',
+    ),
   );
   if (estado === 'PendienteRecepcionPago') return t;
 
-  t.push(hist(now, 'Cobrado', ctx.asesorId, ctx.asesorNombre, 'Marcado cobrado'));
+  t.push(hist(now, 'Cobrado', staff.asesorId, staff.asesorNombre, 'Marcado cobrado'));
   return t;
 }
 
@@ -184,6 +214,39 @@ function buildCaso(ctx: EmpresaSeedCtx, def: CasoDemoDef, index: number): Caso {
   const updatedAt = def.updatedAt ?? autoUpdated;
   const updatedMs = Date.parse(updatedAt);
 
+  const asesorId = ctx.asesorIds[(index - 1) % ctx.asesorIds.length]!;
+  const tecnicoPoolId = ctx.tecnicoIds[(index - 1) % ctx.tecnicoIds.length]!;
+  const staff = {
+    asesorId,
+    asesorNombre: findUserById(asesorId)?.nombre ?? 'Asesor',
+    tecnicoId: tecnicoPoolId,
+    tecnicoNombre: findUserById(tecnicoPoolId)?.nombre ?? 'Técnico',
+  };
+
+  /** Cobranza o visita ya cerrada: ops con montos para balance DEMO realista. */
+  const conOps = comercial || !!def.conFirma;
+  const pagoTecnico = conOps ? 45_000 + (index % 5) * 10_000 : null;
+  const gastosMateriales = conOps
+    ? [
+        {
+          id: `mat-${ctx.prefix}-${index}-1`,
+          descripcion: 'Factura ferretería / materiales',
+          monto: 25_000 + (index % 4) * 5_000,
+          fotoUrl: `https://placehold.co/480x320/png?text=Factura+${index}`,
+        },
+        ...(index % 3 === 0
+          ? [
+              {
+                id: `mat-${ctx.prefix}-${index}-2`,
+                descripcion: 'Repuestos / consumibles',
+                monto: 15_000 + (index % 3) * 8_000,
+                fotoUrl: `https://placehold.co/480x320/png?text=Factura+B${index}`,
+              },
+            ]
+          : []),
+      ]
+    : [];
+
   return {
     id,
     titulo: def.titulo,
@@ -191,8 +254,8 @@ function buildCaso(ctx: EmpresaSeedCtx, def: CasoDemoDef, index: number): Caso {
     cliente: def.aseguradora,
     estado: def.estado,
     empresaId: ctx.empresaId,
-    asesorId: ctx.asesorId,
-    tecnicoId: def.conTecnico ? ctx.tecnicoId : null,
+    asesorId: staff.asesorId,
+    tecnicoId: def.conTecnico ? staff.tecnicoId : null,
     numeroAseguradora: def.numeroAseguradora,
     aseguradora: def.aseguradora,
     titularNombre: def.titularNombre,
@@ -222,7 +285,9 @@ function buildCaso(ctx: EmpresaSeedCtx, def: CasoDemoDef, index: number): Caso {
       def.estado === 'Cobrado'
         ? new Date(updatedMs - 86_400_000).toISOString()
         : null,
-    historialCambios: buildTimeline(ctx, def.estado),
+    pagoTecnico,
+    gastosMateriales,
+    historialCambios: buildTimeline(ctx, def.estado, staff),
     createdAt,
     updatedAt,
   };
@@ -777,10 +842,8 @@ const DEFS_DEMO: CasoDemoDef[] = [
 const CTX_DEMO: EmpresaSeedCtx = {
   empresaId: EMPRESA_DEMO,
   prefix: 'caso-demo',
-  asesorId: 'usr-demo-asesor',
-  asesorNombre: 'Álvaro Asesor Demo',
-  tecnicoId: 'usr-demo-tecnico',
-  tecnicoNombre: 'Tomás Técnico Demo',
+  asesorIds: DEMO_ASESOR_IDS,
+  tecnicoIds: DEMO_TECNICO_IDS,
   adminId: 'usr-demo-admin',
   adminNombre: 'Nora Admin Demo',
 };

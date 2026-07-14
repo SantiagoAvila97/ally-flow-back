@@ -128,7 +128,7 @@ async function insertDemoSeedInDb(): Promise<void> {
         `INSERT INTO items_costo
           (id, empresa_id, categoria_id, nombre, descripcion, costo_interno,
            precio_sugerido, unidad, activo, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+         VALUES ($1,$2,$3,$4,$5,0,$6,$7,$8,$9,$10)
          ON CONFLICT (id) DO NOTHING`,
         [
           item.id,
@@ -136,7 +136,6 @@ async function insertDemoSeedInDb(): Promise<void> {
           item.categoriaId,
           item.nombre,
           item.descripcion,
-          item.costoInterno,
           item.precioSugerido,
           item.unidad,
           item.activo,

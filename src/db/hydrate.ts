@@ -49,7 +49,7 @@ export async function loadAllFromDb(): Promise<{
        FROM categorias_costo`,
     ),
     pool.query(
-      `SELECT id, empresa_id, categoria_id, nombre, descripcion, costo_interno,
+      `SELECT id, empresa_id, categoria_id, nombre, descripcion,
               precio_sugerido, unidad, activo, created_at, updated_at
        FROM items_costo`,
     ),
@@ -113,7 +113,6 @@ export async function loadAllFromDb(): Promise<{
     categoriaId: r.categoria_id,
     nombre: r.nombre,
     descripcion: r.descripcion ?? '',
-    costoInterno: Number(r.costo_interno),
     precioSugerido: Number(r.precio_sugerido),
     unidad: r.unidad,
     activo: r.activo,
@@ -169,6 +168,15 @@ export async function loadAllFromDb(): Promise<{
     documentoCobroGeneradoAt: r.documento_cobro_generado_at
       ? new Date(r.documento_cobro_generado_at).toISOString()
       : null,
+    pagoTecnico: num(r.pago_tecnico),
+    gastosMateriales: Array.isArray(r.gastos_materiales)
+      ? r.gastos_materiales.map((g: Record<string, unknown>, i: number) => ({
+          id: String(g.id ?? `mat-${i}`),
+          descripcion: String(g.descripcion ?? ''),
+          monto: Number(g.monto) || 0,
+          fotoUrl: typeof g.fotoUrl === 'string' ? g.fotoUrl : null,
+        }))
+      : [],
     historialCambios: r.historial_cambios ?? [],
     createdAt: new Date(r.created_at).toISOString(),
     updatedAt: new Date(r.updated_at).toISOString(),

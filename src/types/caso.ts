@@ -31,6 +31,15 @@ export interface LineaCobro {
   precioUnitario: number;
 }
 
+/** Renglón de factura de materiales (foto = factura digital). */
+export interface GastoMaterial {
+  id: string;
+  descripcion: string;
+  monto: number;
+  /** DataURL o URL de la factura escaneada/foto. */
+  fotoUrl: string | null;
+}
+
 /** Estados comerciales ocultos al técnico en bandeja/detalle. */
 export const ESTADOS_OCULTOS_TECNICO: EstadoCaso[] = [
   'PendienteDocumentoCobro',
@@ -39,6 +48,14 @@ export const ESTADOS_OCULTOS_TECNICO: EstadoCaso[] = [
   'Cobrado',
   'EnGarantia',
   'CerradoGarantia',
+];
+
+/** Estados donde ADMIN puede editar gastos de operación. */
+export const ESTADOS_GASTOS_OPERACION: EstadoCaso[] = [
+  'PendienteDocumentoCobro',
+  'PendienteConfirmacionAsegurado',
+  'PendienteRecepcionPago',
+  'Cobrado',
 ];
 
 export interface Caso {
@@ -76,6 +93,11 @@ export interface Caso {
 
   lineasCobro: LineaCobro[];
   documentoCobroGeneradoAt: string | null;
+
+  /** Lo que se paga al técnico por el servicio (COP). null = aún no liquidado. */
+  pagoTecnico: number | null;
+  /** Facturas/materiales cargados por la administradora. */
+  gastosMateriales: GastoMaterial[];
 
   historialCambios: HistorialCambio[];
   createdAt: string;

@@ -112,7 +112,6 @@ export class CostosService {
     if (!descripcion) throw new AppError(400, 'La descripción del ítem es obligatoria');
     const unidad = (input.unidad ?? '').trim();
     if (!unidad) throw new AppError(400, 'La unidad del ítem es obligatoria');
-    this.assertMoney(input.costoInterno, 'costoInterno');
     this.assertMoney(input.precioSugerido, 'precioSugerido');
 
     const now = new Date().toISOString();
@@ -122,7 +121,6 @@ export class CostosService {
       categoriaId: input.categoriaId,
       nombre,
       descripcion,
-      costoInterno: input.costoInterno,
       precioSugerido: input.precioSugerido,
       unidad,
       activo: input.activo ?? true,
@@ -148,10 +146,6 @@ export class CostosService {
       if (!descripcion) throw new AppError(400, 'La descripción no puede quedar vacía');
       item.descripcion = descripcion;
     }
-    if (input.costoInterno !== undefined) {
-      this.assertMoney(input.costoInterno, 'costoInterno');
-      item.costoInterno = input.costoInterno;
-    }
     if (input.precioSugerido !== undefined) {
       this.assertMoney(input.precioSugerido, 'precioSugerido');
       item.precioSugerido = input.precioSugerido;
@@ -167,7 +161,6 @@ export class CostosService {
       categoriaId: item.categoriaId,
       nombre: item.nombre,
       descripcion: item.descripcion,
-      costoInterno: item.costoInterno,
       precioSugerido: item.precioSugerido,
       unidad: item.unidad,
       activo: item.activo,
@@ -402,6 +395,8 @@ function buildCasoDemoPreview(user: PublicUser, aseguradoraNombre: string): Caso
       },
     ],
     documentoCobroGeneradoAt: null,
+    pagoTecnico: null,
+    gastosMateriales: [],
     historialCambios: [],
     createdAt: now,
     updatedAt: now,

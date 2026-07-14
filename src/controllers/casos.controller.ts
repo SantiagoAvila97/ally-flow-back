@@ -63,6 +63,22 @@ const lineasCobroSchema = z.object({
   ),
 });
 
+const gastoMaterialSchema = z.object({
+  id: z.string().optional(),
+  descripcion: z.string().min(1),
+  monto: z.number().min(0),
+  fotoUrl: z.string().nullable().optional(),
+});
+
+const gastosOperacionSchema = z.object({
+  pagoTecnico: z.number().min(0).nullable(),
+  gastosMateriales: z.array(gastoMaterialSchema),
+});
+
+const adjuntarMaterialesSchema = z.object({
+  gastosMateriales: z.array(gastoMaterialSchema).min(1),
+});
+
 export class CasosController {
   list(req: Request, res: Response, next: NextFunction): void {
     try {
@@ -229,6 +245,63 @@ export class CasosController {
             unidad: l.unidad ?? 'und',
             cantidad: l.cantidad,
             precioUnitario: l.precioUnitario,
+          })),
+          req.user!,
+        ),
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  setGastosOperacion(req: Request, res: Response, next: NextFunction): void {
+    try {
+      const parsed = gastosOperacionSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({
+          message: 'Gastos de operación inválidos',
+          errors: parsed.error.flatten().fieldErrors,
+        });
+        return;
+      }
+      res.json({
+        data: casosService.setGastosOperacion(
+          req.params.id!,
+          {
+            pagoTecnico: parsed.data.pagoTecnico,
+            gastosMateriales: parsed.data.gastosMateriales.map((g, i) => ({
+              id: g.id ?? `mat-${i}`,
+              descripcion: g.descripcion,
+              monto: g.monto,
+              fotoUrl: g.fotoUrl ?? null,
+            })),
+          },
+          req.user!,
+        ),
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  adjuntarMateriales(req: Request, res: Response, next: NextFunction): void {
+    try {
+      const parsed = adjuntarMaterialesSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({
+          message: 'Materiales inválidos',
+          errors: parsed.error.flatten().fieldErrors,
+        });
+        return;
+      }
+      res.json({
+        data: casosService.adjuntarMateriales(
+          req.params.id!,
+          parsed.data.gastosMateriales.map((g, i) => ({
+            id: g.id ?? `mat-${Date.now().toString(36)}-${i}`,
+            descripcion: g.descripcion,
+            monto: g.monto,
+            fotoUrl: g.fotoUrl ?? null,
           })),
           req.user!,
         ),

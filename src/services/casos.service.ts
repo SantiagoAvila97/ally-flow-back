@@ -4,12 +4,20 @@ import { findUserById, listUsersByEmpresa, USERS_SEED } from '../data/users.seed
 import { casoRepository, type ICasoRepository } from '../repositories/caso.repository';
 import { catalogoRepository } from '../repositories/catalogo.repository';
 import { catalogosService } from './catalogos.service';
-import type { Caso, CrearCasoInput, EstadoCaso, HistorialCambio, LineaCobro } from '../types/caso';
+import type {
+  Caso,
+  CrearCasoInput,
+  EstadoCaso,
+  GastoMaterial,
+  HistorialCambio,
+  LineaCobro,
+} from '../types/caso';
 import { ESTADOS_CASO, ESTADOS_OCULTOS_TECNICO } from '../types/caso';
 import type { ListCasosQuery, PaginatedResult } from '../types/pagination';
 import { paginate } from '../types/pagination';
 import type { PublicUser } from '../types/user';
 import { assertCasoAction } from '../types/caso-permissions';
+import { gastosOperacionCompletos } from '../types/caso-money';
 import { permissionsForRole } from '../types/permissions';
 import { requireTenantEmpresaId } from './tenant-scope';
 import { titleCaseWords } from '../utils/text';
@@ -29,6 +37,43 @@ function assertMediaPayload(raw: string, field: string): string {
     throw new AppError(400, `${field}: no se permiten URLs. Sube la foto desde el dispositivo`);
   }
   throw new AppError(400, `${field}: solo se aceptan fotos PNG/JPEG/WebP`);
+}
+
+/** DataURL nueva o conservar URL/dataURL ya guardada (p. ej. seed / sin reenviar). */
+function normalizeMaterialFoto(
+  raw: string | null | undefined,
+  previous: string | null | undefined,
+): string | null {
+  const value = (raw ?? '').trim();
+  if (!value) return null;
+  if (previous && value === previous) return previous;
+  if (DATA_IMAGE_RE.test(value)) return assertMediaPayload(value, 'Foto de factura');
+  if (/^https?:\/\//i.test(value) && previous === value) return value;
+  if (/^https?:\/\//i.test(value)) {
+    throw new AppError(400, 'Foto de factura: sube la imagen desde el dispositivo');
+  }
+  throw new AppError(400, 'Foto de factura: solo se aceptan fotos PNG/JPEG/WebP');
+}
+
+function normalizeGastoMaterial(
+  g: GastoMaterial,
+  i: number,
+  previousById: Map<string, GastoMaterial>,
+): GastoMaterial {
+  const descripcion = (g.descripcion ?? '').trim();
+  if (!descripcion) throw new AppError(400, 'Cada material necesita descripción');
+  const monto = Number(g.monto);
+  if (!Number.isFinite(monto) || monto < 0) {
+    throw new AppError(400, 'Monto de material inválido');
+  }
+  const id = (g.id ?? '').trim() || `mat-${Date.now().toString(36)}-${i}`;
+  const prev = previousById.get(id);
+  return {
+    id,
+    descripcion: titleCaseWords(descripcion),
+    monto: Math.round(monto),
+    fotoUrl: normalizeMaterialFoto(g.fotoUrl, prev?.fotoUrl),
+  };
 }
 
 function historial(
@@ -254,6 +299,8 @@ export class CasosService {
       montoEstimado: null,
       lineasCobro: [],
       documentoCobroGeneradoAt: null,
+      pagoTecnico: null,
+      gastosMateriales: [],
       historialCambios: [
         historial('PendienteAsignacion', user, 'Caso creado tras llamada'),
       ],
@@ -448,6 +495,54 @@ export class CasosService {
     return updated;
   }
 
+  setGastosOperacion(
+    id: string,
+    input: { pagoTecnico: number | null; gastosMateriales: GastoMaterial[] },
+    user: PublicUser,
+  ): Caso {
+    const caso = this.getById(id, user);
+    assertCasoAction(user, caso.estado, 'gastos_operacion');
+
+    let pagoTecnico: number | null = input.pagoTecnico;
+    if (pagoTecnico !== null && pagoTecnico !== undefined) {
+      if (!Number.isFinite(pagoTecnico) || pagoTecnico < 0) {
+        throw new AppError(400, 'Pago al técnico inválido');
+      }
+      pagoTecnico = Math.round(Number(pagoTecnico));
+    } else {
+      pagoTecnico = null;
+    }
+
+    const previousById = new Map((caso.gastosMateriales ?? []).map((m) => [m.id, m]));
+    const gastosMateriales = (input.gastosMateriales ?? []).map((g, i) =>
+      normalizeGastoMaterial(g, i, previousById),
+    );
+
+    const updated = this.repo.update(id, { pagoTecnico, gastosMateriales });
+    if (!updated) throw new AppError(404, 'Caso no encontrado');
+    return updated;
+  }
+
+  /** ASESOR/ADMIN: solo agrega materiales (no edita ni borra los existentes ni el pago). */
+  adjuntarMateriales(id: string, nuevos: GastoMaterial[], user: PublicUser): Caso {
+    const caso = this.getById(id, user);
+    assertCasoAction(user, caso.estado, 'materiales_adjuntar');
+    if (caso.esGarantia) {
+      throw new AppError(400, 'Los casos de garantía no registran materiales de cobro');
+    }
+    if (!nuevos?.length) {
+      throw new AppError(400, 'Agrega al menos un material / factura');
+    }
+
+    const previousById = new Map<string, GastoMaterial>();
+    const appended = nuevos.map((g, i) => normalizeGastoMaterial({ ...g, id: '' }, i, previousById));
+    const gastosMateriales = [...(caso.gastosMateriales ?? []), ...appended];
+
+    const updated = this.repo.update(id, { gastosMateriales });
+    if (!updated) throw new AppError(404, 'Caso no encontrado');
+    return updated;
+  }
+
   marcarDocumentoGenerado(id: string, user: PublicUser): Caso {
     const caso = this.getById(id, user);
     assertCasoAction(user, caso.estado, 'lineas_cobro');
@@ -463,6 +558,12 @@ export class CasosService {
     assertCasoAction(user, caso.estado, 'enviar_documento');
     if (!caso.lineasCobro?.length) {
       throw new AppError(400, 'Agrega al menos un ítem de cobro antes de enviar');
+    }
+    if (!gastosOperacionCompletos(caso)) {
+      throw new AppError(
+        400,
+        'Registra el pago al técnico (y materiales si aplica) antes de enviar la factura',
+      );
     }
 
     const updated = this.repo.appendHistorial(
@@ -494,6 +595,12 @@ export class CasosService {
     assertCasoAction(user, caso.estado, 'cobrar');
     if (caso.esGarantia) {
       throw new AppError(400, 'Los casos de garantía no pasan por cobro');
+    }
+    if (!gastosOperacionCompletos(caso)) {
+      throw new AppError(
+        400,
+        'Registra el pago al técnico (y materiales si aplica) antes de marcar pagada',
+      );
     }
 
     const updated = this.repo.appendHistorial(
@@ -530,6 +637,8 @@ export class CasosService {
         lineasCobro: [],
         documentoCobroGeneradoAt: null,
         montoEstimado: null,
+        pagoTecnico: null,
+        gastosMateriales: [],
       },
     );
 

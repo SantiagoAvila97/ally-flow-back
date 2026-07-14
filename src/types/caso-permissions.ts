@@ -18,7 +18,11 @@ export type CasoAction =
   | 'enviar_documento'
   | 'confirmar_asegurado'
   | 'cobrar'
-  | 'garantia';
+  | 'garantia'
+  /** Pago técnico + edición completa de materiales: solo ADMIN (auditoría). */
+  | 'gastos_operacion'
+  /** Adjuntar materiales/facturas (append): ASESOR + ADMIN tras cierre de visita. */
+  | 'materiales_adjuntar';
 
 /** Quién puede ejecutar cada acción (sin importar estado — el estado se valida aparte). */
 export const CASO_ACTION_ROLES: Record<CasoAction, readonly Role[]> = {
@@ -35,6 +39,9 @@ export const CASO_ACTION_ROLES: Record<CasoAction, readonly Role[]> = {
   confirmar_asegurado: ['ADMIN'],
   cobrar: ['ADMIN'],
   garantia: ['ADMIN'],
+  /** Pago técnico + modificar/borrar materiales: solo ADMIN */
+  gastos_operacion: ['ADMIN'],
+  materiales_adjuntar: ['ASESOR', 'ADMIN'],
 };
 
 /** Estados desde los que puede partir cada acción. */
@@ -50,6 +57,18 @@ export const CASO_ACTION_FROM: Record<CasoAction, readonly EstadoCaso[] | null> 
   confirmar_asegurado: ['PendienteConfirmacionAsegurado'],
   cobrar: ['PendienteRecepcionPago'],
   garantia: ['Cobrado', 'CerradoGarantia'],
+  gastos_operacion: [
+    'PendienteDocumentoCobro',
+    'PendienteConfirmacionAsegurado',
+    'PendienteRecepcionPago',
+    'Cobrado',
+  ],
+  materiales_adjuntar: [
+    'PendienteDocumentoCobro',
+    'PendienteConfirmacionAsegurado',
+    'PendienteRecepcionPago',
+    'Cobrado',
+  ],
 };
 
 export function assertCasoActionRole(user: PublicUser, action: CasoAction): void {

@@ -122,7 +122,6 @@ function buildForEmpresa(
     categoriaId: `${i.cat}-${suffix}`,
     nombre: i.nombre,
     descripcion: i.descripcion,
-    costoInterno: i.costo,
     precioSugerido: i.precio,
     unidad: i.unidad,
     activo: true,

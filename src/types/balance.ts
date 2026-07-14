@@ -1,6 +1,7 @@
 import type { EstadoCaso } from './caso';
 
-export type BalancePeriodo = '7d' | '30d' | '90d' | 'all';
+/** `month` = mes calendario en curso; `7d`/`30d`/`90d` = rolling; `all` = sin filtro. */
+export type BalancePeriodo = '7d' | '30d' | '90d' | 'month' | 'all';
 
 export interface BalanceTotales {
   /** PendienteDocumentoCobro: falta armar / enviar el PDF de cobro */
@@ -9,7 +10,7 @@ export interface BalanceTotales {
   /** Confirmación + recepción: ya hay documento, esperamos que nos paguen */
   pendientePago: number;
   casosPendientePago: number;
-  /** Ya marcados como cobrados */
+  /** Ya marcados Cobrado = la aseguradora/cliente pagó (no es pago al técnico). */
   ingresosCobrados: number;
   casosCobrados: number;
   /** Suma de los dos pendientes (enviar + pago) */
@@ -18,6 +19,19 @@ export interface BalanceTotales {
   /** Casos aún en campo / asignación */
   casosEnOperacion: number;
   casosTotal: number;
+
+  /**
+   * Suma pago a técnicos en el periodo (casos en cobranza/ops).
+   * No depende de si la aseguradora ya pagó.
+   */
+  pagoTecnicos: number;
+  /** Suma materiales (misma base que pago técnicos). */
+  materiales: number;
+  /**
+   * Suma utilidad por caso (ingreso armado − pago técnico − materiales).
+   * Independiente del estado Cobrado del cliente.
+   */
+  utilidadOperativa: number;
 }
 
 export interface BalancePorDimension {
@@ -39,6 +53,29 @@ export interface BalanceCasoFila {
   updatedAt: string;
 }
 
+export interface BalanceOpsCasoFila {
+  id: string;
+  titulo: string;
+  numeroAseguradora: string;
+  aseguradora: string;
+  tecnicoId: string | null;
+  tecnicoNombre: string | null;
+  estado: EstadoCaso;
+  ingreso: number;
+  pagoTecnico: number | null;
+  materiales: number;
+  utilidad: number;
+  updatedAt: string;
+}
+
+export interface BalancePorTecnico {
+  tecnicoId: string;
+  tecnicoNombre: string;
+  casos: number;
+  aPagar: number;
+  pendientesLiquidar: number;
+}
+
 export interface BalanceResumen {
   periodo: BalancePeriodo;
   generadoAt: string;
@@ -47,4 +84,30 @@ export interface BalanceResumen {
   casosPendienteEnviar: BalanceCasoFila[];
   casosPendientePago: BalanceCasoFila[];
   cobradosRecientes: BalanceCasoFila[];
+  /** Detalle operativo: ingreso vs gastos. */
+  casosOperacion: BalanceOpsCasoFila[];
+  porTecnico: BalancePorTecnico[];
+}
+
+export interface BalanceTecnicoCasoFila {
+  id: string;
+  titulo: string;
+  numeroAseguradora: string;
+  aseguradora: string;
+  estado: EstadoCaso;
+  cerradoEn: string | null;
+  pagoTecnico: number | null;
+  updatedAt: string;
+}
+
+export interface BalanceTecnicoResumen {
+  periodo: BalancePeriodo;
+  generadoAt: string;
+  totales: {
+    aPagar: number;
+    casosConPago: number;
+    casosPendientes: number;
+    casos: number;
+  };
+  casos: BalanceTecnicoCasoFila[];
 }

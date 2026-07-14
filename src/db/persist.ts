@@ -34,10 +34,11 @@ export async function upsertCaso(caso: Caso): Promise<void> {
       lat, lon, direccion_normalizada, categoria_servicio, observaciones,
       fotos, firma_atendido_url, firma_tecnico_url, gestionado_at,
       es_garantia, caso_origen_id, monto_estimado, lineas_cobro,
-      documento_cobro_generado_at, historial_cambios, created_at, updated_at
+      documento_cobro_generado_at, pago_tecnico, gastos_materiales,
+      historial_cambios, created_at, updated_at
     ) VALUES (
       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,
-      $20::jsonb,$21,$22,$23,$24,$25,$26,$27::jsonb,$28,$29::jsonb,$30,$31
+      $20::jsonb,$21,$22,$23,$24,$25,$26,$27::jsonb,$28,$29,$30::jsonb,$31::jsonb,$32,$33
     )
     ON CONFLICT (id) DO UPDATE SET
       titulo = EXCLUDED.titulo,
@@ -67,6 +68,8 @@ export async function upsertCaso(caso: Caso): Promise<void> {
       monto_estimado = EXCLUDED.monto_estimado,
       lineas_cobro = EXCLUDED.lineas_cobro,
       documento_cobro_generado_at = EXCLUDED.documento_cobro_generado_at,
+      pago_tecnico = EXCLUDED.pago_tecnico,
+      gastos_materiales = EXCLUDED.gastos_materiales,
       historial_cambios = EXCLUDED.historial_cambios,
       updated_at = EXCLUDED.updated_at`,
     [
@@ -98,6 +101,8 @@ export async function upsertCaso(caso: Caso): Promise<void> {
       caso.montoEstimado,
       JSON.stringify(caso.lineasCobro ?? []),
       caso.documentoCobroGeneradoAt,
+      caso.pagoTecnico,
+      JSON.stringify(caso.gastosMateriales ?? []),
       JSON.stringify(caso.historialCambios ?? []),
       caso.createdAt,
       caso.updatedAt,
@@ -145,12 +150,11 @@ export async function upsertItem(item: ItemCosto): Promise<void> {
     `INSERT INTO items_costo
       (id, empresa_id, categoria_id, nombre, descripcion, costo_interno,
        precio_sugerido, unidad, activo, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+     VALUES ($1,$2,$3,$4,$5,0,$6,$7,$8,$9,$10)
      ON CONFLICT (id) DO UPDATE SET
       categoria_id = EXCLUDED.categoria_id,
       nombre = EXCLUDED.nombre,
       descripcion = EXCLUDED.descripcion,
-      costo_interno = EXCLUDED.costo_interno,
       precio_sugerido = EXCLUDED.precio_sugerido,
       unidad = EXCLUDED.unidad,
       activo = EXCLUDED.activo,
@@ -161,7 +165,6 @@ export async function upsertItem(item: ItemCosto): Promise<void> {
       item.categoriaId,
       item.nombre,
       item.descripcion,
-      item.costoInterno,
       item.precioSugerido,
       item.unidad,
       item.activo,

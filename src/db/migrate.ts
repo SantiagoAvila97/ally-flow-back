@@ -124,6 +124,30 @@ EXCEPTION
   WHEN undefined_table THEN
     NULL;
 END $$;
+
+-- Gastos de operación por caso (pago técnico + materiales)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables WHERE table_name = 'casos'
+  ) THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'casos' AND column_name = 'pago_tecnico'
+    ) THEN
+      ALTER TABLE casos ADD COLUMN pago_tecnico NUMERIC;
+    END IF;
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'casos' AND column_name = 'gastos_materiales'
+    ) THEN
+      ALTER TABLE casos ADD COLUMN gastos_materiales JSONB NOT NULL DEFAULT '[]'::jsonb;
+    END IF;
+  END IF;
+EXCEPTION
+  WHEN undefined_table THEN
+    NULL;
+END $$;
 `;
 
 export async function migrate(): Promise<void> {
