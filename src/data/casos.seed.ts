@@ -2,7 +2,21 @@ import type { Caso, EstadoCaso, HistorialCambio, LineaCobro } from '../types/cas
 import { EMPRESA_DEMO } from './empresas.seed';
 import { DEMO_ASESOR_IDS, DEMO_TECNICO_IDS, findUserById } from './users.seed';
 
-/** Fechas relativas al arranque (mocks variados para ordenar en UI). */
+/**
+ * Foto demo local (SVG data URL) — no depende de placehold.co / red.
+ */
+function demoFoto(label: string, w = 480, h = 320, bg = '#e2e8f0', fg = '#475569'): string {
+  return (
+    `data:image/svg+xml,` +
+    encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">` +
+        `<rect fill="${bg}" width="100%" height="100%"/>` +
+        `<text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" ` +
+        `fill="${fg}" font-family="system-ui,sans-serif" font-size="22">${label.slice(0, 28)}</text>` +
+        `</svg>`,
+    )
+  );
+}
 function ago(days: number, hours = 0, minutes = 0): string {
   return new Date(
     Date.now() - days * 86_400_000 - hours * 3_600_000 - minutes * 60_000,
@@ -225,30 +239,59 @@ function buildCaso(ctx: EmpresaSeedCtx, def: CasoDemoDef, index: number): Caso {
     tecnicoNombre: findUserById(tecnicoPoolId)?.nombre ?? 'Técnico',
   };
 
-  /** Cobranza o visita ya cerrada: ops con montos para balance DEMO realista. */
-  const conOps = comercial || !!def.conFirma;
-  const pagoTecnico = conOps ? 45_000 + (index % 5) * 10_000 : null;
+  /** Cobranza, visita cerrada o garantía (conserva cobro/ops previos). */
+  const conOps = comercial || !!def.conFirma || !!def.esGarantia;
+  const pagoTecnico = conOps
+    ? [55_000, 70_000, 85_000, 95_000, 110_000, 125_000, 140_000][index % 7]! +
+      (index % 4) * 7_500
+    : null;
+  const matA = 18_000 + (index % 6) * 8_500;
+  const matB = 12_000 + (index % 5) * 6_000;
+  const matC = 22_000 + (index % 3) * 11_000;
   const gastosMateriales = conOps
     ? [
         {
           id: `mat-${ctx.prefix}-${index}-1`,
-          descripcion: 'Factura ferretería / materiales',
-          monto: 25_000 + (index % 4) * 5_000,
-          fotoUrl: `https://placehold.co/480x320/png?text=Factura+${index}`,
+          descripcion: [
+            'Factura ferretería / consumibles',
+            'Tubos y conexiones',
+            'Cableado y terminales',
+            'Sellos / teflón / adhesivos',
+          ][index % 4]!,
+          monto: matA,
+          fotoUrl: demoFoto(`Mat ${index}-A`),
         },
-        ...(index % 3 === 0
+        {
+          id: `mat-${ctx.prefix}-${index}-2`,
+          descripcion: [
+            'Repuestos / kit de reparación',
+            'Válvula / cartucho',
+            'Breakers / tomas',
+            'Adaptadores y uniones',
+          ][index % 4]!,
+          monto: matB,
+          fotoUrl: demoFoto(`Mat ${index}-B`),
+        },
+        ...(index % 2 === 0
           ? [
               {
-                id: `mat-${ctx.prefix}-${index}-2`,
-                descripcion: 'Repuestos / consumibles',
-                monto: 15_000 + (index % 3) * 8_000,
-                fotoUrl: `https://placehold.co/480x320/png?text=Factura+B${index}`,
+                id: `mat-${ctx.prefix}-${index}-3`,
+                descripcion: 'Transporte / flete de materiales',
+                monto: matC,
+                fotoUrl: demoFoto(`Mat ${index}-C`),
               },
             ]
           : []),
       ]
     : [];
 
+  const lineasGarantia =
+    def.esGarantia && !comercial ? (def.lineas ?? PACK.medio) : lineas;
+  const lineasFinal = comercial ? lineas : lineasGarantia;
+  const montoFinal =
+    comercial || (def.esGarantia && lineasFinal.length)
+      ? sumLineas(lineasFinal)
+      : null;
   return {
     id,
     titulo: def.titulo,
@@ -269,9 +312,7 @@ function buildCaso(ctx: EmpresaSeedCtx, def: CasoDemoDef, index: number): Caso {
     lat: null,
     lon: null,
     direccionNormalizada: null,
-    fotos: def.conFotos
-      ? [`https://placehold.co/600x400/111111/ffffff?text=${encodeURIComponent(def.estado)}`]
-      : [],
+    fotos: def.conFotos ? [demoFoto(def.estado, 600, 400, '#111111', '#ffffff')] : [],
     firmaAtendidoUrl: def.conFirma
       ? 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
       : null,
@@ -279,12 +320,13 @@ function buildCaso(ctx: EmpresaSeedCtx, def: CasoDemoDef, index: number): Caso {
     gestionadoAt: def.conFirma ? new Date(updatedMs - 3_600_000).toISOString() : null,
     esGarantia,
     casoOrigenId: esGarantia ? `${ctx.prefix}-origen` : null,
-    montoEstimado: comercial ? sumLineas(lineas) : null,
-    lineasCobro: lineas,
+    montoEstimado: montoFinal,
+    lineasCobro: comercial || def.esGarantia ? lineasFinal : [],
     documentoCobroGeneradoAt:
       def.estado === 'PendienteConfirmacionAsegurado' ||
       def.estado === 'PendienteRecepcionPago' ||
-      def.estado === 'Cobrado'
+      def.estado === 'Cobrado' ||
+      (!!def.esGarantia && def.estado !== 'PendienteAsignacion')
         ? new Date(updatedMs - 86_400_000).toISOString()
         : null,
     pagoTecnico,
@@ -778,9 +820,9 @@ const DEFS_DEMO: CasoDemoDef[] = [
     updatedAt: twoWeeksAgo,
   },
 
-  // Garantía
+  // Garantía abierta → Asignado + esGarantia (técnico ve el caso)
   {
-    estado: 'EnGarantia',
+    estado: 'Asignado',
     titulo: 'Garantía peritaje moto',
     numeroAseguradora: 'DEMO-GA-001',
     aseguradora: 'Sura Seguros',
@@ -794,7 +836,7 @@ const DEFS_DEMO: CasoDemoDef[] = [
     esGarantia: true,
   },
   {
-    estado: 'EnGarantia',
+    estado: 'Asignado',
     titulo: 'Garantía glass - revisit',
     numeroAseguradora: 'DEMO-GA-002',
     aseguradora: 'Liberty Seguros',

@@ -21,15 +21,13 @@ export interface BalanceTotales {
   casosTotal: number;
 
   /**
-   * Suma pago a técnicos en el periodo (casos en cobranza/ops).
-   * No depende de si la aseguradora ya pagó.
+   * Pago a técnicos: casos Pagados (cliente) con liquidación definida.
    */
   pagoTecnicos: number;
-  /** Suma materiales (misma base que pago técnicos). */
+  /** Materiales (misma base: Pagados con liquidación). */
   materiales: number;
   /**
-   * Suma utilidad por caso (ingreso armado − pago técnico − materiales).
-   * Independiente del estado Cobrado del cliente.
+   * Utilidad = ingreso cobrado − técnico − materiales (solo Pagadas liquidas).
    */
   utilidadOperativa: number;
 }
@@ -64,7 +62,7 @@ export interface BalanceOpsCasoFila {
   ingreso: number;
   pagoTecnico: number | null;
   materiales: number;
-  utilidad: number;
+  utilidad: number | null;
   updatedAt: string;
 }
 

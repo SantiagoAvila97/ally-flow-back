@@ -136,7 +136,18 @@ export class CasosService {
     }
 
     if (query.estado && (ESTADOS_CASO as readonly string[]).includes(query.estado)) {
-      items = items.filter((c) => c.estado === query.estado);
+      // Pagadas: incluir garantía activa (cobro conservado) y estados legacy de garantía.
+      if (query.estado === 'Cobrado') {
+        items = items.filter(
+          (c) =>
+            c.estado === 'Cobrado' ||
+            c.esGarantia === true ||
+            c.estado === 'EnGarantia' ||
+            c.estado === 'CerradoGarantia',
+        );
+      } else {
+        items = items.filter((c) => c.estado === query.estado);
+      }
     }
     if (query.categoria) {
       items = items.filter((c) => c.categoriaServicio === query.categoria);
@@ -613,19 +624,22 @@ export class CasosService {
   }
 
   /**
-   * Reabre el caso por garantía (sin cobro). Solo ADMIN.
+   * Reabre el caso por garantía (sin cobro nuevo). Solo ADMIN.
+   * Deja el caso listo para visita: Asignado (si hay técnico) o Por asignar.
+   * Conserva cobro/ops: al cerrar la garantía vuelve a Pagada.
    */
   abrirGarantia(id: string, user: PublicUser): Caso {
     const caso = this.getById(id, user);
     assertCasoAction(user, caso.estado, 'garantia');
 
+    const nextEstado = caso.tecnicoId ? 'Asignado' : 'PendienteAsignacion';
     const updated = this.repo.appendHistorial(
       id,
       historial(
-        'EnGarantia',
+        nextEstado,
         user,
         caso.tecnicoId
-          ? 'Garantía abierta — confirma o reasigna técnico'
+          ? 'Garantía abierta — técnico puede iniciar visita'
           : 'Garantía abierta — pendiente de asignar técnico',
       ),
       {
@@ -635,7 +649,6 @@ export class CasosService {
         firmaAtendidoUrl: null,
         firmaTecnicoUrl: null,
         gestionadoAt: null,
-        // Conserva cobro/ops: al cerrar la garantía el caso vuelve a Pagada (Cobrado).
       },
     );
 

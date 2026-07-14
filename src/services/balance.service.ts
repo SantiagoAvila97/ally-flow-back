@@ -7,9 +7,6 @@ import type {
 } from '../types/balance';
 import type { Caso, EstadoCaso } from '../types/caso';
 import {
-  ESTADOS_GASTOS_OPERACION,
-} from '../types/caso';
-import {
   ingresoCaso,
   totalMateriales,
   utilidadOperativa,
@@ -154,9 +151,10 @@ export class BalanceService {
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
       .slice(0, 10);
 
-    // Ops / pago técnico: no depende de Cobrado (aseguradora).
+    // Utilidad / pago técnicos / materiales: solo casos Pagados (cliente).
+    // Si falta liquidar técnico, no se suma utilidad (ni se trata null como 0).
     const casosOperacion = casos
-      .filter((c) => ESTADOS_GASTOS_OPERACION.includes(c.estado) && !c.esGarantia)
+      .filter((c) => c.estado === 'Cobrado' && !c.esGarantia)
       .map((c) => ({
         id: c.id,
         titulo: c.titulo,
@@ -168,15 +166,16 @@ export class BalanceService {
         ingreso: ingresoCaso(c),
         pagoTecnico: c.pagoTecnico,
         materiales: totalMateriales(c.gastosMateriales),
-        utilidad: utilidadOperativa(c),
+        utilidad: c.pagoTecnico == null ? null : utilidadOperativa(c),
         updatedAt: c.updatedAt,
       }))
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
     for (const c of casosOperacion) {
-      totales.pagoTecnicos += c.pagoTecnico ?? 0;
+      if (c.pagoTecnico == null) continue;
+      totales.pagoTecnicos += c.pagoTecnico;
       totales.materiales += c.materiales;
-      totales.utilidadOperativa += c.utilidad;
+      totales.utilidadOperativa += c.utilidad ?? 0;
     }
 
     const techMap = new Map<string, BalanceResumen['porTecnico'][0]>();
